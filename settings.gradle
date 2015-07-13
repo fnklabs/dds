@@ -1,0 +1,8 @@
+rootProject.name = "fnklabs-dds-parent"
+
+
+include ":dds-network",":dds-core",":dds-coordinator"
+
+project(':dds-network').name = 'dds-network'
+project(':dds-core').name = 'dds-core'
+project(':dds-coordinator').name = 'dds-coordinator'
