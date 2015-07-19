@@ -3,20 +3,18 @@ package com.fnklabs.dds.network.client;
 import com.codahale.metrics.Counter;
 import com.codahale.metrics.Timer;
 import com.fnklabs.dds.Metrics;
-import com.fnklabs.dds.network.Operation;
-import com.fnklabs.dds.network.Packet;
-import com.fnklabs.dds.network.ResponseFuture;
-import com.fnklabs.dds.network.client.exception.RemoveTimeoutRequest;
+import com.fnklabs.dds.network.Message;
+import com.fnklabs.dds.network.connector.Fragmentation;
 import com.fnklabs.dds.network.connector.exception.HostNotAvailableException;
-import com.fnklabs.dds.network.connector.MessageBuffer;
-import com.fnklabs.dds.network.connector.MessageUtils;
-import com.fnklabs.dds.network.connector.NetworkMessage;
 import com.google.common.net.HostAndPort;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayInputStream;
+import java.io.Closeable;
 import java.io.IOException;
-import java.io.Serializable;
+import java.io.ObjectInputStream;
 import java.net.InetSocketAddress;
 import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
@@ -24,67 +22,42 @@ import java.nio.channels.ClosedSelectorException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Set;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
-class ClientConnector {
-    public static final Logger LOGGER = LoggerFactory.getLogger(ClientConnector.class);
-    private static final int MSG_BUFFER_SIZE = 64 * 1024; // 64 KB
-    private static final int REQUEST_TIMEOUT = 5000;
-    private static final AtomicInteger RETRIEVED_SELECTOR_EVENTS = new AtomicInteger(0);
-    private static final int QUEUE_CAPACITY = 5000;
-    private static final int AWAIT_TERMINATION_SECONDS = 10;
-    private static final int BUFFER_SIZE = Packet.SIZE;
+class ClientConnector implements Closeable {
 
-    private final AtomicLong ID_SEQUENCE = new AtomicLong(1);
+    private static final Logger LOGGER = LoggerFactory.getLogger(ClientConnector.class);
 
     /**
-     * Queue of notification messages or messages that are not linked with local response futures by Message id
+     * Messages from server
      */
-    private final ArrayBlockingQueue<MessageBuffer> notificationMessages = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
+    private final ConcurrentLinkedQueue<Message> messagesFromServer = new ConcurrentLinkedQueue<>();
 
     /**
-     * Waiting response by message id
+     * Remote address
      */
-    private final ConcurrentHashMap<Long, ResponseFuture> responseFutures = new ConcurrentHashMap<>();
-
-    /**
-     * Pending response by packet id
-     */
-    private final ConcurrentHashMap<Long, MessageBuffer> pendingResponse = new ConcurrentHashMap<>();
-
-    /**
-     * Data buffer
-     */
-    private final ByteBuffer buffer = ByteBuffer.allocate(BUFFER_SIZE);
-
     private HostAndPort remoteAddress;
-
     /**
      * Client channel
      */
     private SocketChannel channel;
-
     /**
      * Selector
      */
     private Selector selector;
-
     /**
      *
      */
-    private AtomicLong retrievedPackets = new AtomicLong(0);
-
+    private AtomicBoolean isRunning = new AtomicBoolean(true);
     /**
-     *
+     * Incoming message messageBuffer
      */
-    private AtomicBoolean isActive = new AtomicBoolean(false);
+    private ByteBuffer messageBuffer = ByteBuffer.allocate(Message.MAX_MESSAGE_SIZE);
 
     private ClientConnector() {
 
@@ -103,9 +76,9 @@ class ClientConnector {
         LOGGER.warn("Building client: {}:{}", remoteAddress.getHostText(), remoteAddress.getPort());
 
         clientConnector.channel = SocketChannel.open();
-
         clientConnector.channel.setOption(StandardSocketOptions.TCP_NODELAY, true);
         clientConnector.channel.configureBlocking(false);
+
         boolean connect = clientConnector.channel.connect(new InetSocketAddress(remoteAddress.getHostText(), remoteAddress.getPort()));
 
         if (!connect) {
@@ -122,12 +95,14 @@ class ClientConnector {
         return clientConnector;
     }
 
-    public ArrayBlockingQueue<MessageBuffer> getNotificationMessages() {
-        return notificationMessages;
+    public ConcurrentLinkedQueue<Message> getMessagesFromServer() {
+        return messagesFromServer;
     }
 
+    @Override
     public void close() {
-        isActive.set(false);
+        isRunning.set(false);
+
         try {
             selector.close();
             channel.close();
@@ -138,31 +113,24 @@ class ClientConnector {
         LOGGER.info("Close connector: {}", remoteAddress);
     }
 
-    public <T extends Serializable> ResponseFuture send(Operation operation, T data) {
+    /**
+     * Send message to remote server
+     *
+     * @param data Data that must be sent
+     */
+    public void send(@NotNull ByteBuffer data) {
         Timer.Context timer = Metrics.getTimer(Metrics.Type.NET_CLIENT_SEND_MESSAGES).time();
 
-        ResponseFuture responseFuture = new ResponseFuture();
-
-
-        long id = getIdSequence();
-
-        NetworkMessage<T> networkMessage = new NetworkMessage<>();
-        networkMessage.setOperationCode(operation.getCode());
-        networkMessage.setId(id);
-        networkMessage.setData(data);
-
-        MessageBuffer transform = MessageUtils.transform(networkMessage);
-
         try {
-            Packet.splitToPacket(transform.getResponseBuffer(), splittedData -> {
-                try {
-                    write(splittedData);
-                } catch (HostNotAvailableException e) {
-                    LOGGER.warn("Can't write data", e);
+            ByteBuffer message = ByteBuffer.allocate(data.limit() + Integer.BYTES);
+            message.putInt(data.limit());
+            message.put(data);
 
-                    throw e;
-                }
-            });
+            message.rewind();
+
+            int writtenBytes = write(message);
+
+            LOGGER.debug("Send bytes: {}", writtenBytes);
 
             Counter counter = Metrics.getCounter(Metrics.Type.NET_CLIENT_SUCCESS_SEND_MESSAGES);
             counter.inc();
@@ -171,116 +139,100 @@ class ClientConnector {
             counter.inc();
         }
 
-
-        responseFutures.put(id, responseFuture);
-
         timer.stop();
-
-        return responseFuture;
     }
 
+    /**
+     * Join thread pool for processing selector events
+     *
+     * @param executorService ExecutorService in which worker will be running
+     */
     public void join(ExecutorService executorService) {
-        executorService.submit(new ProcessSelectorEventsHandler(this, executorService));
-
-        executorService.submit(new RemoveTimeoutRequest(executorService, responseFutures));
+        executorService.submit(new ProcessSelectorEventsTask(this, executorService, isRunning));
     }
 
-    protected long getIdSequence() {
-        return ID_SEQUENCE.getAndIncrement();
-    }
 
+    /**
+     * Process selector for retrieving messages from server
+     */
     protected synchronized void processSelectorEvents() {
         try {
-            if (!isActive.get()) {
+            if (!isRunning.get()) {
                 LOGGER.warn("Connector to host {} is closed. Skip operation", remoteAddress);
             }
 
-            try {
-                int select = selector.select(1);
-                if (select == 0) {
-                    return;
-                }
-            } catch (ClosedSelectorException e) {
-                LOGGER.warn("Selector is closed.", e);
-
+            if (!hasNewEvents()) {
                 return;
             }
 
-            RETRIEVED_SELECTOR_EVENTS.getAndIncrement();
-
             Set<SelectionKey> keys = selector.selectedKeys();
 
-            for (Iterator i = keys.iterator(); i.hasNext(); ) {
-                retrievedPackets.getAndIncrement();
+            LOGGER.debug("New events: {}", keys.size());
 
-//                LOGGER.debug("New events: {}", keys.size());
+            Metrics.getCounter(Metrics.Type.NET_SELECTOR_EVENTS).inc(keys.size());
+
+            for (Iterator i = keys.iterator(); i.hasNext(); ) {
+                Metrics.getCounter(Metrics.Type.NET_CLIENT_RETRIEVED_PACKETS).inc();
 
                 SelectionKey key = (SelectionKey) i.next();
                 i.remove();
 
-
                 SocketChannel clientSocketChannel = (SocketChannel) key.channel();
-                if (!key.isReadable())
+
+                if (!key.isReadable()) {
                     continue;
+                }
 
-                try {
-                    while (true) {
-                        int receivedBytes = clientSocketChannel.read(buffer);
+                while (true) {
+                    /**
+                     * read data from socket into the messageBuffer
+                     */
+                    int receivedBytes = clientSocketChannel.read(messageBuffer);
 
-                        if (receivedBytes == 0) {
-                            break;
-                        }
-
-                        LOGGER.debug("{} New read bytes. received bytes: {}", channel.getLocalAddress(), receivedBytes);
-
-                        if (receivedBytes == -1) {
-                            key.cancel();
-                            clientSocketChannel.close();
-                            continue;
-                        }
-
-                        if (receivedBytes < BUFFER_SIZE) {
-                            continue;
-                        }
-
-                        buffer.rewind();
-
-                        long packetId = Packet.getId(buffer);
-                        int sequenceId = Packet.getSequence(buffer);
-                        ByteBuffer data = Packet.getData(buffer);
-
-
-                        MessageBuffer connectorMessageBuffer = pendingResponse.get(packetId);
-
-                        if (connectorMessageBuffer == null) {
-                            Metrics.getCounter(Metrics.Type.NET_CLIENT_RETRIEVED_MESSAGES).inc();
-                            connectorMessageBuffer = new MessageBuffer(0, getBuffer());
-                            pendingResponse.put(packetId, connectorMessageBuffer);
-                        }
-
-                        connectorMessageBuffer.append(data);
-
-                        if (connectorMessageBuffer.isFullyReceived()) {
-
-                            pendingResponse.remove(packetId);
-
-                            if (responseFutures.containsKey(connectorMessageBuffer.getId())) {
-
-                                ResponseFuture responseFuture = responseFutures.get(connectorMessageBuffer.getId());
-                                responseFuture.onResponse(connectorMessageBuffer);
-
-                                responseFutures.remove(connectorMessageBuffer.getId());
-                            } else {
-                                notificationMessages.offer(connectorMessageBuffer);
-                            }
-
-                        }
-
-                        buffer.clear();
+                    /**
+                     * Check if no data in socket and nothing to read then break loop reading operation
+                     */
+                    if (receivedBytes == 0) {
+                        break;
                     }
 
-                } catch (Exception e) {
-                    LOGGER.warn("Invalid response", e);
+                    LOGGER.debug("{} New read bytes. received bytes: {}", channel.getLocalAddress(), receivedBytes);
+
+                    /**
+                     * Check if socket was closed
+                     */
+                    if (receivedBytes == -1) {
+                        key.cancel();
+                        clientSocketChannel.close();
+                        continue;
+                    }
+
+                    int messageLength = Fragmentation.getMessageLength(messageBuffer);
+
+                    if (messageLength <= messageBuffer.position() - Integer.BYTES) {
+
+                        Metrics.getCounter(Metrics.Type.NET_CLIENT_RETRIEVED_MESSAGES).inc();
+
+                        byte[] receivedData = Arrays.copyOfRange(messageBuffer.array(), Integer.BYTES, messageLength + Integer.BYTES);
+
+                        if (messageLength < messageBuffer.position() - Integer.BYTES) {
+                            byte[] data = Arrays.copyOfRange(messageBuffer.array(), messageLength + Integer.BYTES, messageBuffer.position());
+
+                            messageBuffer.clear(); // free messageBuffer
+                            messageBuffer.put(data); // add tail of buffer if there was data
+                        } else {
+                            messageBuffer.clear(); // free messageBuffer
+                        }
+
+                        /**
+                         * Unserialize data into Message object
+                         */
+                        ObjectInputStream objectInputStream = new ObjectInputStream(new ByteArrayInputStream(receivedData));
+                        Message o = (Message) objectInputStream.readObject();
+
+                        LOGGER.debug("New messages from server ID: {} Reply ID: {} Status: {}", o.getId(), o.getReplyMessageId(), o.getStatusCode());
+                        messagesFromServer.offer(o);
+                    }
                 }
             }
 
@@ -290,19 +242,41 @@ class ClientConnector {
     }
 
     /**
+     * Check whether selector has new events
+     *
+     * @return true if selector has new events false otherwise
+     *
+     * @throws IOException
+     */
+    private boolean hasNewEvents() throws IOException {
+        try {
+            int select = selector.select(1);
+
+            if (select > 0) {
+                return true;
+            }
+        } catch (ClosedSelectorException e) {
+            LOGGER.warn("Selector is closed.", e);
+        }
+
+        return false;
+    }
+
+    /**
      * Write data to channel
      *
      * @param data Data/message
      *
      * @throws HostNotAvailableException if cant send data
      */
-    private void write(ByteBuffer data) throws HostNotAvailableException {
+    private int write(ByteBuffer data) throws HostNotAvailableException {
         Timer.Context timer = Metrics.getTimer(Metrics.Type.NET_WRITE_BYTES).time();
+
+        int writtenData = 0;
+
         try {
-            while (data.hasRemaining()) {
-                int numBytesWritten = channel.write(data);
-                LoggerFactory.getLogger(getClass()).debug("Written data: {}", numBytesWritten);
-            }
+            writtenData = channel.write(data);
+            LoggerFactory.getLogger(getClass()).debug("Written data: {}", writtenData);
         } catch (IOException e) {
             LOGGER.warn("Cant write data to channel" + remoteAddress, e);
 
@@ -310,17 +284,8 @@ class ClientConnector {
         } finally {
             timer.stop();
         }
-    }
 
-    /**
-     * Return Message buffer for specified message ID
-     *
-     * @return Buffer
-     *
-     * @throws IOException
-     */
-    private ByteBuffer getBuffer() throws IOException {
-        return ByteBuffer.allocate(MSG_BUFFER_SIZE);
+        return writtenData;
     }
 
 

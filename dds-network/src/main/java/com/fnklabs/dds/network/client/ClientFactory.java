@@ -1,5 +1,6 @@
 package com.fnklabs.dds.network.client;
 
+import com.fnklabs.dds.network.Message;
 import com.fnklabs.dds.network.client.exception.ClientException;
 import com.fnklabs.dds.network.client.exception.RemoteHostIsNotAvailable;
 import com.google.common.net.HostAndPort;
@@ -8,19 +9,28 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.io.IOException;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.function.Consumer;
 
 public class ClientFactory {
-    private static final int CORE_POOL_SIZE = 2;
-    private static final int MAX_POOL_SIZE = 2;
+    private static final int CORE_POOL_SIZE = 4;
+    private static final int MAX_POOL_SIZE = 4;
     private static final ThreadPoolTaskExecutor THREAD_POOL_EXECUTOR;
     private static final int QUEUE_CAPACITY = 500;
 
     private static final int AWAIT_TERMINATION_SECONDS = 360;
 
-    public static Client build(HostAndPort remoteAddress) throws ClientException {
+    /**
+     * @param remoteAddress   Remote host address
+     * @param messageConsumer System messages consumer
+     *
+     * @return New network client
+     *
+     * @throws ClientException if can't connect to remote host
+     */
+    public static Client build(HostAndPort remoteAddress, Consumer<Message> messageConsumer) throws ClientException {
         try {
             ClientConnector clientConnector = ClientConnector.build(remoteAddress);
-            return Client.create(clientConnector, getThreadPoolExecutor());
+            return Client.create(clientConnector, getThreadPoolExecutor(), messageConsumer);
         } catch (IOException e) {
             LoggerFactory.getLogger(ClientFactory.class).warn("Cant build client connector", e);
         }

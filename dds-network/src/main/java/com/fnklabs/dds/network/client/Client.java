@@ -1,29 +1,85 @@
 package com.fnklabs.dds.network.client;
 
-import com.fnklabs.dds.network.Operation;
-import com.fnklabs.dds.network.exception.RequestException;
+import com.fnklabs.dds.network.ApiVersion;
+import com.fnklabs.dds.network.Message;
 import com.fnklabs.dds.network.ResponseFuture;
-import com.fnklabs.dds.network.connector.MessageBuffer;
+import com.fnklabs.dds.network.StatusCode;
+import com.fnklabs.dds.network.exception.RequestException;
 
-import java.io.Serializable;
+import java.io.ByteArrayOutputStream;
+import java.io.Closeable;
+import java.io.IOException;
+import java.io.ObjectOutputStream;
+import java.nio.ByteBuffer;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
-public class Client {
+public class Client implements Closeable {
 
     /**
      * Is client running
      */
-    private final AtomicBoolean isActive = new AtomicBoolean(true);
-
+    private final AtomicBoolean isRunning = new AtomicBoolean(true);
     /**
      * Client connector instance
      */
-    private final ClientConnector clientConnector;
+    private final ClientConnector connector;
 
-    private Client(ClientConnector clientConnector) {
-        this.clientConnector = clientConnector;
+
+    /**
+     * Response futures map
+     */
+    private Map<Long, ResponseFuture> responseFutures = new ConcurrentHashMap<>();
+
+    private Client(ClientConnector connector) {
+        this.connector = connector;
+    }
+
+    /**
+     * Send message
+     *
+     * @throws RequestException if send request message
+     */
+    public ResponseFuture send(ByteBuffer data) throws RequestException {
+        ResponseFuture responseFuture = new ResponseFuture();
+
+        long messageId = Message.getNextId();
+
+        Message message = new Message(messageId, 0, StatusCode.OK, ApiVersion.VERSION_1, data.array(), 0);
+
+        try {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            ObjectOutputStream objectOutputStream = new ObjectOutputStream(out);
+            objectOutputStream.writeObject(message);
+
+            byte[] bytes = out.toByteArray();
+
+
+            connector.send(ByteBuffer.wrap(bytes));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+
+        responseFutures.put(messageId, responseFuture);
+
+        return responseFuture;
+    }
+
+    @Override
+    public void close() {
+        connector.close();
+        isRunning.set(false);
+    }
+
+    private void join(ExecutorService executorService, Consumer<Message> messageConsumer) {
+        connector.join(executorService);
+
+        executorService.submit(new MessageHandlerTask(executorService, connector.getMessagesFromServer(), messageConsumer, responseFutures, isRunning));
+        executorService.submit(new RemovePendingRequestTask(responseFutures, executorService, isRunning));
     }
 
     /**
@@ -31,44 +87,10 @@ public class Client {
      *
      * @return Client instance
      */
-    public static Client create(ClientConnector clientConnector, ExecutorService executorService) {
+    protected static Client create(ClientConnector clientConnector, ExecutorService executorService, Consumer<Message> messageConsumer) {
         Client client = new Client(clientConnector);
-        client.join(executorService);
+        client.join(executorService, messageConsumer);
 
         return client;
-    }
-
-    /**
-     * Send message
-     *
-     * @param operation Operation type
-     *
-     * @return Request id
-     *
-     * @throws RequestException if send request message
-     */
-    public <T extends Serializable> ResponseFuture send(Operation operation, T data) throws RequestException {
-        return clientConnector.send(operation, data);
-    }
-
-    public void close() {
-        clientConnector.close();
-        isActive.set(false);
-    }
-
-    protected void join(ExecutorService executorService) {
-        executorService.submit(() -> new MessageHandler(executorService, clientConnector.getNotificationMessages(), new Consumer<MessageBuffer>() {
-            @Override
-            public void accept(MessageBuffer messageBuffer) {
-                if (messageBuffer != null) {
-                    long replyMessageId = messageBuffer.getReplyMessageId();
-
-
-                    // todo process message
-                }
-            }
-        }));
-
-        clientConnector.join(executorService);
     }
 }

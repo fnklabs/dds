@@ -1,4 +1,4 @@
-package com.fnklabs.dds.network;
+package com.fnklabs.dds;
 
 public enum OperationType implements Operation {
 
@@ -104,4 +104,11 @@ public enum OperationType implements Operation {
     public int getCode() {
         return getValue();
     }
+
+    @Override
+    public byte[] getData() {
+        return new byte[0];
+    }
+
+
 }

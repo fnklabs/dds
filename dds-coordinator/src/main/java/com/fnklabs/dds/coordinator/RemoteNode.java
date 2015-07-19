@@ -1,9 +1,9 @@
 package com.fnklabs.dds.coordinator;
 
 import com.fnklabs.dds.coordinator.operation.Elect;
-import com.fnklabs.dds.network.OperationType;
+import com.fnklabs.dds.OperationType;
 import com.fnklabs.dds.network.client.Client;
-import com.fnklabs.dds.network.connector.MessageBuffer;
+import com.fnklabs.dds.network.Message;
 import com.google.common.net.HostAndPort;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -90,7 +90,8 @@ public class RemoteNode implements Node {
 
     @Override
     public ListenableFuture<Long> ping(Long time) {
-        return transform(client.send(OperationType.PING, time));
+        return null;
+//        return transform(client.send(OperationType.PING, time));
     }
 
     @Override
@@ -155,9 +156,9 @@ public class RemoteNode implements Node {
      *
      * @return Future for response transformation
      */
-    private ListenableFuture<Boolean> transformStatusIsOk(ListenableFuture<MessageBuffer> response) {
-        return Futures.transform(response, (MessageBuffer messageBuffer) -> {
-            return messageBuffer.isOk();
+    private ListenableFuture<Boolean> transformStatusIsOk(ListenableFuture<Message> response) {
+        return Futures.transform(response, (Message message) -> {
+            return message.isOk();
         }, executorService);
     }
 
@@ -169,8 +170,8 @@ public class RemoteNode implements Node {
      *
      * @return Future for response transformation
      */
-    private <T> ListenableFuture<T> transform(ListenableFuture<MessageBuffer> response) {
-        return Futures.transform(response, (MessageBuffer item) -> {
+    private <T> ListenableFuture<T> transform(ListenableFuture<Message> response) {
+        return Futures.transform(response, (Message item) -> {
             if (!item.isOk()) {
                 return null;
             }
@@ -188,7 +189,7 @@ public class RemoteNode implements Node {
      *
      * @return Response future
      */
-    private ListenableFuture<MessageBuffer> send(OperationType operationType, Serializable object) {
-        return getClient().send(operationType, object);
+    private ListenableFuture<Message> send(OperationType operationType, Serializable object) {
+        return null;//getClient().send(operationType, object);
     }
 }

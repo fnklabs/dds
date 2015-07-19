@@ -1,7 +1,7 @@
 package com.fnklabs.dds.coordinator;
 
 import com.fnklabs.dds.Metrics;
-import com.fnklabs.dds.network.Server;
+import com.fnklabs.dds.network.server.Server;
 import com.google.common.net.HostAndPort;
 import com.google.common.util.concurrent.*;
 import org.apache.commons.io.FileUtils;
@@ -524,7 +524,7 @@ public class LocalNode implements Node {
      */
     public void shutdown() {
         LOGGER.warn("Shutdown node...");
-        server.stop();
+//        server.stop();
         LOGGER.warn("Node was shutdown");
     }
 

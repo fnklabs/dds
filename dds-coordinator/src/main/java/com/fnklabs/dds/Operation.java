@@ -1,4 +1,4 @@
-package com.fnklabs.dds.network;
+package com.fnklabs.dds;
 
 /**
  * Operation interface

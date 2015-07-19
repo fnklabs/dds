@@ -1,4 +1,4 @@
-package com.fnklabs.dds.network.connector;
+package com.fnklabs.dds;
 
 import com.fnklabs.dds.network.StatusCode;
 

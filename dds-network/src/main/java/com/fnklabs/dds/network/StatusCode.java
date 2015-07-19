@@ -4,16 +4,31 @@ package com.fnklabs.dds.network;
  * Response status code
  */
 public enum StatusCode {
+    /**
+     * Message was successfully processed
+     */
     OK(0),
 
+    /**
+     * Invalid message format
+     */
     BAD_FORMAT(200),
-    UNKNOWN_OPERATION_TYPE(210),
 
+    /**
+     * Server is busy and can't process request
+     */
     SERVER_IS_BUSY(500),
 
+    /**
+     * Processing timeout
+     */
     TIMEOUT(600),
 
+    /**
+     * Can't pack message
+     */
     CANT_PACK_MESSAGE(700),
+
     /**
      * Unexpected exception
      */

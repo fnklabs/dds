@@ -1,7 +1,6 @@
 package com.fnklabs.dds.coordinator;
 
-import com.fnklabs.dds.network.connector.Message;
-import com.fnklabs.dds.network.MessageHandler;
+import com.fnklabs.dds.Message;
 import com.fnklabs.dds.network.exception.RequestException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,7 +8,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Ring Network request handler
  */
-class ServerEventsHandler implements MessageHandler {
+class ServerEventsHandler {
 
     /**
      * Server events handler
@@ -40,7 +39,7 @@ class ServerEventsHandler implements MessageHandler {
 //        return ResponseHelper.pack(requestBuffer.getId(), operationType, StatusCode.UNKNOWN);
 //    }
 
-    @Override
+//    @Override
     public Message handle(Message requestBuffer) throws RequestException {
         return null;
     }
