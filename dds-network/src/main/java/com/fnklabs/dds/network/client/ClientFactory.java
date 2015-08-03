@@ -27,10 +27,10 @@ public class ClientFactory {
      *
      * @throws ClientException if can't connect to remote host
      */
-    public static Client build(HostAndPort remoteAddress, Consumer<Message> messageConsumer) throws ClientException {
+    public static NetworkClient build(HostAndPort remoteAddress, Consumer<Message> messageConsumer) throws ClientException {
         try {
             ClientConnector clientConnector = ClientConnector.build(remoteAddress);
-            return Client.create(clientConnector, getThreadPoolExecutor(), messageConsumer);
+            return NetworkClient.create(clientConnector, getThreadPoolExecutor(), messageConsumer);
         } catch (IOException e) {
             LoggerFactory.getLogger(ClientFactory.class).warn("Cant build client connector", e);
         }

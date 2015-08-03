@@ -1,11 +1,9 @@
 package com.fnklabs.dds.network;
 
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.LoggerFactory;
 
-import java.io.Externalizable;
-import java.io.IOException;
-import java.io.ObjectInput;
-import java.io.ObjectOutput;
+import java.io.*;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -77,10 +75,6 @@ public class Message implements Externalizable {
      * Message data
      */
     private byte[] messageData;
-    /**
-     *
-     */
-    private AtomicLong retrievedBytes = new AtomicLong(0);
 
     /**
      *
@@ -89,6 +83,7 @@ public class Message implements Externalizable {
     @Deprecated
     public Message() {
     }
+
 
     /**
      * @param id             Message id. Must be unique per session
@@ -109,21 +104,43 @@ public class Message implements Externalizable {
         messageSize = HEADER_SIZE + messageData.length;
     }
 
-//    /**
-//     * Constructor for internal use. Used for {@link ResponseFuture#onTimeout(HostAndPort, long, int)} to create timeout message
-//     *
-//     * @param id             Message id
-//     * @param replyMessageId Reply message id
-//     * @param statusCode     Response message code
-//     * @param apiVersion     Api version
-//     */
-//    public Message(long id, long replyMessageId, @NotNull StatusCode statusCode, int apiVersion) {
-//        this.id = id;
-//        this.replyMessageId = replyMessageId;
-//        this.statusCode = statusCode;
-//        this.apiVersion = apiVersion;
-//        this.client = client;
-//    }
+    /**
+     * Create reply message from specified message
+     *
+     * @param message     Message from which we must create reply
+     * @param statusCode  Reply code
+     * @param apiVersion  Api version
+     * @param messageData Reply message data
+     *
+     * @return Reply message
+     */
+    public static <T> Message createReply(Message message, @NotNull StatusCode statusCode, int apiVersion, @NotNull T messageData) {
+        try {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            ObjectOutputStream objectOutputStream = new ObjectOutputStream(out);
+            objectOutputStream.writeObject(messageData);
+
+            return new Message(getNextId(), message.getId(), statusCode, apiVersion, out.toByteArray(), message.getClient());
+        } catch (IOException e) {
+            LoggerFactory.getLogger(Message.class).warn("Can't serialize input object", e);
+        }
+
+        return new Message(getNextId(), message.getId(), StatusCode.UNKNOWN, apiVersion, new byte[0], message.getClient());
+    }
+
+    /**
+     * Create reply message from specified message
+     *
+     * @param message     Message from which we must create reply
+     * @param statusCode  Reply code
+     * @param apiVersion  Api version
+     * @param messageData Reply message data
+     *
+     * @return Reply message
+     */
+    public static Message createReply(Message message, @NotNull StatusCode statusCode, int apiVersion, @NotNull byte[] messageData) {
+        return new Message(getNextId(), message.getId(), statusCode, apiVersion, messageData, message.getClient());
+    }
 
     /**
      * Get next sequence id
@@ -188,21 +205,8 @@ public class Message implements Externalizable {
         return apiVersion;
     }
 
-    public boolean isFullyReceived() {
-        return getMessageSize() <= retrievedBytes.get();
-    }
-
     public byte[] getMessageData() {
         return messageData;
-    }
-
-    /**
-     * Get data size
-     *
-     * @return Data size
-     */
-    public int getDataSize() {
-        return getMessageData().length;
     }
 
     @Override

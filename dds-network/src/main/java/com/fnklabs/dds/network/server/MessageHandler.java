@@ -1,6 +1,7 @@
 package com.fnklabs.dds.network.server;
 
 import com.fnklabs.dds.network.Message;
+import com.google.common.util.concurrent.ListenableFuture;
 
 /**
  * Request message handler
@@ -11,5 +12,5 @@ public interface MessageHandler {
      *
      * @param message Message
      */
-    Message handle(Message message);
+    ListenableFuture<Message> handle(Message message);
 }

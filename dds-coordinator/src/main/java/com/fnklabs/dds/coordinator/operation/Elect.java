@@ -11,23 +11,20 @@ import java.util.SortedSet;
  * All members from ring must add theirs address to elected set
  */
 public class Elect extends DistributedOperation implements Serializable {
-    private NodeInfo sender;
 
-    private SortedSet<NodeInfo> elected;
+    /**
+     * Elected nodes (nodes that was registered in chain)
+     */
+    private final SortedSet<NodeInfo> elected;
 
-    private long created = System.currentTimeMillis();
+    private final long created = System.currentTimeMillis();
 
-    public Elect(NodeInfo sender, SortedSet<NodeInfo> elected) {
-        this.sender = sender;
+    public Elect(SortedSet<NodeInfo> elected) {
         this.elected = elected;
     }
 
     public long getCreated() {
         return created;
-    }
-
-    public NodeInfo getSender() {
-        return sender;
     }
 
     public SortedSet<NodeInfo> getElected() {

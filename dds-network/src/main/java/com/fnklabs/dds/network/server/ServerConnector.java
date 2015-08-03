@@ -64,6 +64,10 @@ class ServerConnector implements Closeable {
         this.listenInterfaceAndPort = listenInterfaceAndPort;
     }
 
+    public HostAndPort getListenInterfaceAndPort() {
+        return listenInterfaceAndPort;
+    }
+
     /**
      * Send message to remote client
      *

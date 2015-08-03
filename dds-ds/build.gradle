@@ -41,7 +41,6 @@ buildscript {
 apply plugin: 'java'
 apply plugin: 'idea'
 apply plugin: 'maven'
-apply plugin: 'artifactory'
 
 
 configurations {
@@ -52,7 +51,7 @@ configurations {
 dependencies {
     compile 'org.slf4j:slf4j-api:1.7.9'
     compile 'ch.qos.logback:logback-classic:1.1.2'
-
+    compile 'com.esotericsoftware:kryo:3.0.2'
 
     compile 'org.springframework:spring-context:4.1.4.RELEASE'
     compile 'com.ecyrd.speed4j:speed4j:0.12'
@@ -60,7 +59,6 @@ dependencies {
     compile 'org.apache.commons:commons-lang3:3.3.2'
     compile 'org.apache.commons:commons-io:1.3.2'
 
-    compile 'com.google.code.findbugs:annotations:3.0.0'
     compile 'com.google.guava:guava:18.0'
 
     compile 'junit:junit:4.12'
@@ -72,41 +70,13 @@ dependencies {
     compile 'joda-time:joda-time:2.5'
     compile 'com.intellij:annotations:12.0'
 
-    compile project(":dds-network")
     compile project(":dds-core")
-    compile project(":dds-coordinator")
-    compile project(":dds-ds")
-
+    
 }
 
-artifactory {
-    contextUrl = 'https://artifactory.fnklabs.com/artifactory'
-
-    publish {
-        contextUrl = 'https://artifactory.fnklabs.com/artifactory'
-        repository {
-            contextUrl = 'https://artifactory.fnklabs.com/artifactory'
-            repoKey = 'libs-release-local'
-            username = 'teamcity'
-            password = "DMP2!=z[NP4isZ<VD/,-/F'M_"
-            ivy {
-                ivyLayout = '[organization]/[module]/[revision]/[type]s/ivy-[revision].xml'
-                artifactLayout = '[organization]/[module]/[revision]/[module]-[revision](-[classifier]).[ext]'
-                mavenCompatible = true //Convert any dots in an [organization] layout value to path separators, similar to Maven's groupId-to-path conversion. True if not specified
-
-            }
-        }
-    }
-
-    resolve {
-        repository {
-            repoKey = 'libs-release'
-        }
-    }
-}
 
 jar {
-    baseName = 'fnklabs-dds'
+    baseName = 'dds-ds'
     version = project.ext.buildVersion
 }
 

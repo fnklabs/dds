@@ -3,62 +3,71 @@ package com.fnklabs.dds.coordinator;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Objects;
 import com.google.common.net.HostAndPort;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.joda.time.DateTime;
 
 import java.io.Serializable;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.UUID;
 
 /**
  * Node information contains node address and version
  */
-public class NodeInfo implements Serializable, Comparable<NodeInfo> {
+public final class NodeInfo implements Serializable, Comparable<NodeInfo> {
+
+    private static final long serialVersionUID = 2046031529312431612L;
+
+    /**
+     * Node id
+     */
+    @NotNull
+    private final UUID id;
 
     /**
      * Node address
      */
+    @NotNull
     private final HostAndPort address;
 
     /**
      * Node version
      */
-    private final String version;
+    private final int version;
 
-    /**
-     * Buckets set that current node is owning
-     */
-    private final Set<Bucket> buckets = new HashSet<>();
-    /**
-     * Mirrors set for current node
-     */
-    private final Set<NodeInfo> mirrors = new HashSet<>();
     /**
      * Node status
      */
-    private NodeStatus status = NodeStatus.SYNCHRONIZATION;
+    @NotNull
+    private final Node.NodeStatus status;
+
     /**
      * Last time when current node was updated
      */
-    private long lastUpdated = System.currentTimeMillis();
+    @NotNull
+    private final DateTime lastUpdated = DateTime.now();
 
-    public NodeInfo(HostAndPort address, String version) {
+    /**
+     * @param id      Node id
+     * @param address Node address
+     * @param version Node api version number
+     * @param status  Node status
+     */
+    public NodeInfo(@NotNull UUID id, @NotNull HostAndPort address, int version, @NotNull Node.NodeStatus status) {
+        this.id = id;
         this.address = address;
         this.version = version;
+        this.status = status;
     }
 
-    public Set<Bucket> getBuckets() {
-        return buckets;
+    public UUID getId() {
+        return id;
     }
 
-    public Set<NodeInfo> getMirrors() {
-        return mirrors;
-    }
-
-    public NodeStatus getStatus() {
+    public Node.NodeStatus getStatus() {
         return status;
     }
 
-    public long getLastUpdated() {
+    public DateTime getLastUpdated() {
         return lastUpdated;
     }
 
@@ -66,7 +75,7 @@ public class NodeInfo implements Serializable, Comparable<NodeInfo> {
         return address;
     }
 
-    public String getVersion() {
+    public int getVersion() {
         return version;
     }
 
@@ -102,6 +111,10 @@ public class NodeInfo implements Serializable, Comparable<NodeInfo> {
 
     @Override
     public String toString() {
-        return MoreObjects.toStringHelper(this).add("Host", getAddress().toString()).add("Version", getVersion()).toString();
+        return MoreObjects
+                .toStringHelper(this)
+                .add("Host", getAddress().toString())
+                .add("Version", getVersion())
+                .toString();
     }
 }

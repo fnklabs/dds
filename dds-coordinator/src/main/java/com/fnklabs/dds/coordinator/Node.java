@@ -3,13 +3,14 @@ package com.fnklabs.dds.coordinator;
 import com.google.common.net.HostAndPort;
 import com.google.common.util.concurrent.ListenableFuture;
 
-import java.util.List;
-import java.util.SortedSet;
-import java.util.function.Consumer;
+import java.io.Closeable;
 
-public interface Node {
+/**
+ * Cluster node instance
+ */
+public interface Node extends Closeable {
     /**
-     * Default ring port
+     * Default coordinator port
      */
     int DEFAULT_PORT = 10000;
 
@@ -18,59 +19,21 @@ public interface Node {
      *
      * @return Host address
      */
-    HostAndPort getAddress();
+    HostAndPort getAddressAndPort();
 
     /**
-     * Get node information
-     *
-     * @return Node information
-     */
-    NodeInfo getNodeInfo();
-
-    /**
-     * Retrieve information about ring/cluster
-     *
-     * @return Future for get RingInfo operation and return null on future error
-     */
-    ListenableFuture<RingInfo> getClusterInfo();
-
-
-    /**
-     * Elect new coordinator
-     *
-     * @param activeNodes Current active nodes
-     *
-     * @return Future for  Elect operation and return null on future error
-     */
-    ListenableFuture<Boolean> elect(SortedSet<NodeInfo> activeNodes);
-
-    /**
-     * Notify node that it was elected like coordinator
-     *
-     * @param nodeInfo NodeInfo
-     *
-     * @return Future for Elected operation and return null on future error
-     */
-    ListenableFuture<Boolean> elected(NodeInfo nodeInfo);
-
-    /**
-     * Get node version
-     *
-     * @return Version of node
-     */
-    String getNodeVersion();
-
-    /**
-     * Notify current node that specified node was up and register in the ring
+     * Notify node that specified node was up and register it in the cluster
+     * <p>
+     * Set up new node into to the cluster if {@link NodeInfo#getClass()} is null
      *
      * @param nodeInfo New node info
      *
-     * @return Future for get NodeUp operation and return null on future error
+     * @return Future for getInstance NodeUp operation and return null on future error
      */
-    ListenableFuture<RingInfo> nodeUp(NodeInfo nodeInfo);
+    ListenableFuture<ClusterInformation> nodeUp(NodeInfo nodeInfo);
 
     /**
-     * Notify current node that specified node was down and remove from the ring
+     * Notify node that specified node was down and remove it from the cluster
      *
      * @param nodeInfo Node info
      *
@@ -79,115 +42,99 @@ public interface Node {
     ListenableFuture<Boolean> nodeDown(NodeInfo nodeInfo);
 
     /**
-     * Join current node to the ring and if there are active session with another ring we must unregister from it
+     * Run repair operation in cluster.
      * <p>
-     * Will retrieve coordinator from on of the member and call {@link #nodeUp(NodeInfo)}
+     * Must recalculate Partition table and start repartition operation
      *
-     * @param ring Ring that we must join
+     * @param clusterInformation New cluster information by which repartition must be done
      *
-     * @return Future for JoinRing operation and return null on future error
+     * @return Future for repair operation
      */
-    ListenableFuture<Boolean> joinRing(Ring ring);
-
-
-    ListenableFuture<Boolean> updateRingInfo(RingInfo ringInfo);
+    ListenableFuture<Boolean> repair(ClusterInformation clusterInformation);
 
     /**
-     * Ping host and return latency time
+     * Get current node information
      *
-     * @param time Current time
+     * @return Node information
+     */
+    ListenableFuture<NodeInfo> getNodeInfo();
+
+    /**
+     * Retrieve information about cluster from current node
+     *
+     * @return Future for getInstance RingInfo operation and return null on future error
+     */
+    ListenableFuture<ClusterInformation> getClusterInfo();
+
+    /**
+     * Notification about ring info was updated
+     *
+     * @param clusterInformation New ring information
+     *
+     * @return true if RingInfo was successfully update false otherwise
+     */
+    ListenableFuture<Boolean> updateClusterInfo(ClusterInformation clusterInformation);
+
+    /**
+     * Ping host and return latency (diff of time when ping messages was send to remote node and when reply was retrieved)
      *
      * @return Future for Ping operation and return null on future error
      */
-    ListenableFuture<Long> ping(Long time);
+    ListenableFuture<Long> ping();
 
     /**
-     * Destroy DDS and all it's chunks data on current node
+     * Node status normal flow:
+     * <pre>
      *
-     * @param distributedDataSet DDS
-     * @param <T>                DDS type
+     *
+     * START_UP -> STARTING_UP -> SETUP -> SETTING_UP -> REPAIR -> SYNCHRONIZATION -> UP
+     *
+     * </pre>
      */
-    <T extends Record> ListenableFuture<Boolean> destroyDataSet(DistributedDataSet<T> distributedDataSet);
+    enum NodeStatus {
+        /**
+         * If node status is unknown. Indicate when node was just start up
+         */
+        START_UP,
 
-    /**
-     * Discover and return all local chunks by specified DDS
-     *
-     * @param distributedDataSet DDS
-     * @param <T>                DDS type
-     *
-     * @return Chunks list
-     */
-    <T extends Record> ListenableFuture<List<ChunkDataSet<T>>> discoverChunks(DistributedDataSet<T> distributedDataSet);
+        STARTING_UP,
 
-    /**
-     * Create chunk on this node
-     *
-     * @param distributedDataSet DDS
-     * @param <T>                DDS type
-     *
-     * @return New chunk
-     */
-    <T extends Record> ListenableFuture<ChunkDataSet<T>> createChunk(DistributedDataSet<T> distributedDataSet);
+        /**
+         * Setup new node into the cluster and run repartition over cluster
+         */
+        SETUP,
 
-    /**
-     * Create Chunk on this node
-     *
-     * @param ddsId DDS id
-     * @param clazz DDS class type
-     * @param <T>   DDS type
-     *
-     * @return New chunk
-     */
-    <T extends Record> ListenableFuture<ChunkDataSet<T>> createChunk(String ddsId, Class<T> clazz);
+        /**
+         * Setting up node in the cluster
+         */
+        SETTING_UP,
 
-    /**
-     * Destroy chunk on this
-     *
-     * @param chunkDataSet Chunk
-     * @param <T>          Chunk Type
-     */
-    <T extends Record> ListenableFuture<Boolean> destroyChunk(ChunkDataSet<T> chunkDataSet);
 
-    /**
-     * Read data from chunk and send it to consumer row by row
-     *
-     * @param chunkDataSet Chunk
-     * @param consumer     Row Consumer
-     * @param <T>          Chunk type
-     */
-    <T extends Record> ListenableFuture<Boolean> read(ChunkDataSet<T> chunkDataSet, Consumer<T> consumer);
+        /**
+         * Repair cluster (remove down down) and run repartition over cluster
+         */
+        REPAIR,
 
-    /**
-     * Write data to chunk
-     *
-     * @param chunkDataSet Chunk
-     * @param object       data object
-     * @param <T>          Chunk and data object type
-     */
-    <T extends Record> ListenableFuture<Boolean> write(ChunkDataSet<T> chunkDataSet, T object);
+        /**
+         * Node is up (just started) but synchronization in progress and it's doesn't available for any operations
+         */
+        SYNCHRONIZATION,
 
-    /**
-     * Retrieve chunk size
-     *
-     * @param chunkDataSet Chunk
-     * @param <T>          Chunk type
-     *
-     * @return Chunk size
-     */
-    <T extends Record> ListenableFuture<Long> getChunkSize(ChunkDataSet<T> chunkDataSet);
+        /**
+         * Node is up and available for any operation
+         */
+        UP,
 
-    /**
-     * Get chunk objects count stored in specified chunk
-     *
-     * @param chunkDataSet Chunk
-     * @param <T>          Chunk type
-     *
-     * @return Object count
-     */
-    <T extends Record> ListenableFuture<Long> getChunkElementsCount(ChunkDataSet<T> chunkDataSet);
+        /**
+         * Node is down and doesn't available for any operation
+         */
+        DOWN,
 
-    /**
-     * Flush all data from stream to storage
-     */
-    ListenableFuture<Boolean> flush();
+        /**
+         * If node is not responding to much on any operation
+         */
+        NOT_RESPOND,
+
+        SHUTDOWN,
+    }
 }

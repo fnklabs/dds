@@ -16,7 +16,7 @@ import java.util.function.Function;
 /**
  * Distributed operation in the cluster that must achieve some consistency level
  */
-public class DistributedOperation {
+abstract class DistributedOperation implements Operation {
 
     /**
      * Execute operation

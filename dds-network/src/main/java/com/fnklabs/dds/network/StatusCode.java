@@ -15,9 +15,16 @@ public enum StatusCode {
     BAD_FORMAT(200),
 
     /**
+     * Unknown or unsupported message api
+     */
+    UNKNOWN_API_VERSION(210),
+
+    /**
      * Server is busy and can't process request
      */
     SERVER_IS_BUSY(500),
+
+    SERVER_IS_NOT_AVAILABLE_FOR_OPERATIONS(510),
 
     /**
      * Processing timeout

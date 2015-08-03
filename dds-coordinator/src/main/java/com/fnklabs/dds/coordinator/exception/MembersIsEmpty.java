@@ -1,4 +1,4 @@
 package com.fnklabs.dds.coordinator.exception;
 
-public class MembersIsEmpty extends RingException {
+public class MembersIsEmpty extends ClusterException {
 }
