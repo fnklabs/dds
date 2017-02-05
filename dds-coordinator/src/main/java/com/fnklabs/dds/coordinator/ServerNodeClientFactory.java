@@ -6,25 +6,25 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.util.Enumeration;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 public class ServerNodeClientFactory {
     private static final Logger LOGGER = LoggerFactory.getLogger(ServerNodeClientFactory.class);
 
-    private static final ThreadPoolTaskExecutor THREAD_POOL_EXECUTOR;
+    private static final ThreadPoolExecutor CLIENT_THREAD_POOL_EXECUTOR;
 
     private static final int CORE_POOL_SIZE = 2;
     private static final int MAX_POOL_SIZE = 2;
     private static final int QUEUE_CAPACITY = 500;
-    private static final int AWAIT_TERMINATION_SECONDS = 60;
-
 
     private static final ConcurrentHashMap<HostAndPort, ServerNodeClient> nodes = new ConcurrentHashMap<>();
 
@@ -39,14 +39,13 @@ public class ServerNodeClientFactory {
      * @return Node instance
      */
     @Nullable
-    public synchronized ServerNodeClient getInstance(HostAndPort nodeAddress) {
-        ServerNodeClient serverNodeClient = nodes.get(nodeAddress);
-
-        if (serverNodeClient == null) {
-            serverNodeClient = build(nodeAddress);
-        }
-
-        return serverNodeClient;
+    public ServerNodeClient getInstance(HostAndPort nodeAddress) {
+        return nodes.computeIfAbsent(nodeAddress, new Function<HostAndPort, ServerNodeClient>() {
+            @Override
+            public ServerNodeClient apply(HostAndPort hostAndPort) {
+                return build(nodeAddress);
+            }
+        });
     }
 
     /**
@@ -84,23 +83,20 @@ public class ServerNodeClientFactory {
 
     @Nullable
     private static ServerNodeClient build(@NotNull HostAndPort hostAndPort) {
-        //            if (isLocal(hostAndPort)) {
-//                return new ServerNode(hostAndPort, THREAD_POOL_EXECUTOR.getThreadPoolExecutor());
-//            } else {
-        return new ServerNodeClient(hostAndPort, THREAD_POOL_EXECUTOR.getThreadPoolExecutor());
-
-//            }
+        return new ServerNodeClient(hostAndPort, CLIENT_THREAD_POOL_EXECUTOR);
     }
 
     static {
-        THREAD_POOL_EXECUTOR = new ThreadPoolTaskExecutor();
-        THREAD_POOL_EXECUTOR.setCorePoolSize(CORE_POOL_SIZE);
-        THREAD_POOL_EXECUTOR.setMaxPoolSize(MAX_POOL_SIZE);
-        THREAD_POOL_EXECUTOR.setQueueCapacity(QUEUE_CAPACITY);
-        THREAD_POOL_EXECUTOR.setThreadNamePrefix("Coordinator-");
-        THREAD_POOL_EXECUTOR.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
-        THREAD_POOL_EXECUTOR.setWaitForTasksToCompleteOnShutdown(true);
-        THREAD_POOL_EXECUTOR.setAwaitTerminationSeconds(AWAIT_TERMINATION_SECONDS);
-        THREAD_POOL_EXECUTOR.initialize();
+
+        CLIENT_THREAD_POOL_EXECUTOR = new ThreadPoolExecutor(
+                CORE_POOL_SIZE,
+                MAX_POOL_SIZE,
+                0L,
+                TimeUnit.SECONDS,
+                new ArrayBlockingQueue<Runnable>(QUEUE_CAPACITY),
+                new com.fnklabs.concurrent.ThreadFactory("network-worker-"),
+                new ThreadPoolExecutor.CallerRunsPolicy()
+        );
+
     }
 }

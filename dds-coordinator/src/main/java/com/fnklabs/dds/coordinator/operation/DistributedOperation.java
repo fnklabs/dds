@@ -90,15 +90,17 @@ abstract class DistributedOperation implements Operation {
 
         return Futures.transform(userFunction.apply(nodeInfo), (Boolean response) -> {
 
-            if (response) {
-                SettableFuture<Boolean> successFuture = SettableFuture.<Boolean>create();
-                successFuture.set(true);
-                return successFuture;
-            }
+//            if (response) {
+//                SettableFuture<Boolean> successFuture = SettableFuture.<Boolean>create();
+//                successFuture.set(true);
+//                return successFuture;
+//            }
+//
+//            retryCount.decrementAndGet();
+//
+//            return executeCallback(userFunction, nodeInfo, retryCount);
 
-            retryCount.decrementAndGet();
-
-            return executeCallback(userFunction, nodeInfo, retryCount);
+            return null;
         }, MoreExecutors.sameThreadExecutor());
     }
 }

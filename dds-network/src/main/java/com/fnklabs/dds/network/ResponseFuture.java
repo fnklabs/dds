@@ -1,14 +1,18 @@
 package com.fnklabs.dds.network;
 
-import com.fnklabs.dds.network.connector.exception.ConnectionException;
-import com.fnklabs.dds.network.exception.TimeoutException;
 import com.google.common.net.HostAndPort;
 import com.google.common.util.concurrent.AbstractFuture;
+import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.Nullable;
 
+import java.util.concurrent.TimeUnit;
+
+@RequiredArgsConstructor
 public class ResponseFuture extends AbstractFuture<Message> {
-    private static final int TIMEOUT = 15000;
+    private static final int TIMEOUT = 30_000;
+    private final Message message;
 
-    private long createdAt = System.currentTimeMillis();
+    private final long createdAt = System.nanoTime();
 
     public void onResponse(Message connectorMessage) {
         set(connectorMessage);
@@ -18,19 +22,19 @@ public class ResponseFuture extends AbstractFuture<Message> {
         setException(new ConnectionException(throwable.getMessage(), address));
     }
 
-    public void onTimeout(HostAndPort address, long latency, int retryCount) {
-        setException(new TimeoutException());
+    public void onTimeout(@Nullable HostAndPort address, long latency, int retryCount) {
+        setException(new TimeoutException(message));
     }
 
     public boolean isExpired() {
-        return getLatency() > TIMEOUT;
+        return TimeUnit.MILLISECONDS.convert(getLatency(), TimeUnit.NANOSECONDS) > TIMEOUT;
     }
 
     public void onTimeout() {
         onTimeout(null, getLatency(), 1);
     }
 
-    private long getLatency() {
-        return System.currentTimeMillis() - createdAt;
+    public long getLatency() {
+        return System.nanoTime() - createdAt;
     }
 }

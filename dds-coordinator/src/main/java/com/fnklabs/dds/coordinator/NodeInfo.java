@@ -59,18 +59,22 @@ public final class NodeInfo implements Serializable, Comparable<NodeInfo> {
         this.status = status;
     }
 
+    @NotNull
     public UUID getId() {
         return id;
     }
 
+    @NotNull
     public Node.NodeStatus getStatus() {
         return status;
     }
 
+    @NotNull
     public DateTime getLastUpdated() {
         return lastUpdated;
     }
 
+    @NotNull
     public HostAndPort getAddress() {
         return address;
     }
@@ -115,6 +119,7 @@ public final class NodeInfo implements Serializable, Comparable<NodeInfo> {
                 .toStringHelper(this)
                 .add("Host", getAddress().toString())
                 .add("Version", getVersion())
+                .add("Status", getStatus())
                 .toString();
     }
 }

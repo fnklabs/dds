@@ -13,12 +13,7 @@ enum ClusterStatus {
     /**
      * If repartition needed when new node was up or one of the members node is down
      */
-    INCONSISTENT,
-
-    /**
-     * Repartition operation in progress (moving data or something else)
-     */
-    SYNCHRONIZATION,
+    REPAIR,
 
     /**
      * When cluster status is unknown or can't be retrieved

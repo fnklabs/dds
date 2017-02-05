@@ -1,19 +1,53 @@
 package com.fnklabs.dds.network;
 
+import com.fnklabs.metrics.MetricsFactory;
+import com.fnklabs.metrics.Timer;
+import com.google.common.base.Verify;
+import lombok.ToString;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.nio.Buffer;
+import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Base message interface
+ * Network message
  * <p>
- * Parameter: | ID DATA   | REPLY MESSAGE ID | MESSAGE SIZE | STATUS CODE | API Version | Message DATA |
- * Size:      | 8 bytes   | 8 bytes          | 4 bytes      | 4 bytes     | 4 bytes     | 4 bytes      |
- * Range      | 0-7 bytes | 8-15 bytes       | 16-19 bytes  | 20-23 bytes | 24-27       | 28-N         |
+ * <table>
+ * <tr>
+ * <th>Parameter</th>
+ * <th>ID Data</th>
+ * <th>REPLY MESSAGE ID</th>
+ * <th>MESSAGE SIZE</th>
+ * <th>STATUS CODE</th>
+ * <th>API Version</th>
+ * <th>Message DATA</th>
+ * </tr>
+ * <tr>
+ * <th>Size (<i>in bytes</i>)</th>
+ * <td>8</td>
+ * <td>8</td>
+ * <td>4</td>
+ * <td>4</td>
+ * <td>4</td>
+ * <td>~</td>
+ * </tr>
+ * <tr>
+ * <th>Range</th>
+ * <td>0-7</td>
+ * <td>8-15</td>
+ * <td>16-19</td>
+ * <td>20-23</td>
+ * <td>24-27</td>
+ * <td>28-N</td>
+ * </tr>
+ * </table>
  */
-public class Message implements Externalizable {
+@ToString(of = {"id", "replyMessageId", "client", "statusCode", "apiVersion"})
+class Message {
 
     public static final int MAX_MESSAGE_SIZE = 5 * 1024 * 1024; // 5MB
     /**
@@ -45,8 +79,17 @@ public class Message implements Externalizable {
      * Message header size in bytes
      */
     final static int HEADER_SIZE = 28;
+
+    /**
+     * Message sequence ID
+     */
     private static final AtomicLong ID_SEQUENCE = new AtomicLong(0);
-    private static final long serialVersionUID = -8246409308426854643L;
+
+    /**
+     *
+     */
+    private static final long serialVersionUID = -2754921141679850688L;
+
     /**
      * Network Client id for internal use
      */
@@ -70,7 +113,7 @@ public class Message implements Externalizable {
     /**
      * Api version number
      */
-    private int apiVersion;
+    private ApiVersion apiVersion;
     /**
      * Message data
      */
@@ -79,67 +122,56 @@ public class Message implements Externalizable {
     /**
      *
      */
-    @SuppressWarnings("Used for serialization. Don't use current constructor")
-    @Deprecated
-    public Message() {
+    private Message() {
     }
 
+    /**
+     * @param statusCode  Message status code. Set {@link StatusCode#OK} if it's not reply message
+     * @param apiVersion  Api version. Use {@link ApiVersion#VERSION_1} constants
+     * @param messageData Message data
+     */
+    public Message(StatusCode statusCode, ApiVersion apiVersion, @Nullable byte[] messageData) {
+        this.id = ID_SEQUENCE.incrementAndGet();
+        this.replyMessageId = 0;
+        this.statusCode = statusCode;
+        this.apiVersion = apiVersion;
+        this.messageData = messageData;
+
+        messageSize = HEADER_SIZE + (messageData != null ? messageData.length : 0);
+    }
 
     /**
-     * @param id             Message id. Must be unique per session
      * @param replyMessageId Reply message id, must be < 0 if message is not reply
      * @param statusCode     Message status code. Set {@link StatusCode#OK} if it's not reply message
      * @param apiVersion     Api version. Use {@link ApiVersion#VERSION_1} constants
      * @param messageData    Message data
      * @param client         Client id. User by server to identify to which client must be send message
      */
-    public Message(long id, long replyMessageId, @NotNull StatusCode statusCode, int apiVersion, @NotNull byte[] messageData, long client) {
-        this.id = id;
+    public Message(long replyMessageId, StatusCode statusCode, ApiVersion apiVersion, @Nullable byte[] messageData, long client) {
+        this.id = ID_SEQUENCE.incrementAndGet();
         this.replyMessageId = replyMessageId;
         this.statusCode = statusCode;
         this.apiVersion = apiVersion;
         this.messageData = messageData;
         this.client = client;
 
-        messageSize = HEADER_SIZE + messageData.length;
+        messageSize = HEADER_SIZE + (messageData != null ? messageData.length : 0);
     }
 
     /**
-     * Create reply message from specified message
-     *
-     * @param message     Message from which we must create reply
-     * @param statusCode  Reply code
-     * @param apiVersion  Api version
-     * @param messageData Reply message data
-     *
-     * @return Reply message
+     * @param replyMessageId Reply message id, must be < 0 if message is not reply
+     * @param statusCode     Message status code. Set {@link StatusCode#OK} if it's not reply message
+     * @param apiVersion     Api version. Use {@link ApiVersion#VERSION_1} constants
+     * @param messageData    Message data
      */
-    public static <T> Message createReply(Message message, @NotNull StatusCode statusCode, int apiVersion, @NotNull T messageData) {
-        try {
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            ObjectOutputStream objectOutputStream = new ObjectOutputStream(out);
-            objectOutputStream.writeObject(messageData);
+    public Message(long replyMessageId, StatusCode statusCode, ApiVersion apiVersion, @Nullable byte[] messageData) {
+        this.id = ID_SEQUENCE.incrementAndGet();
+        this.replyMessageId = replyMessageId;
+        this.statusCode = statusCode;
+        this.apiVersion = apiVersion;
+        this.messageData = messageData;
 
-            return new Message(getNextId(), message.getId(), statusCode, apiVersion, out.toByteArray(), message.getClient());
-        } catch (IOException e) {
-            LoggerFactory.getLogger(Message.class).warn("Can't serialize input object", e);
-        }
-
-        return new Message(getNextId(), message.getId(), StatusCode.UNKNOWN, apiVersion, new byte[0], message.getClient());
-    }
-
-    /**
-     * Create reply message from specified message
-     *
-     * @param message     Message from which we must create reply
-     * @param statusCode  Reply code
-     * @param apiVersion  Api version
-     * @param messageData Reply message data
-     *
-     * @return Reply message
-     */
-    public static Message createReply(Message message, @NotNull StatusCode statusCode, int apiVersion, @NotNull byte[] messageData) {
-        return new Message(getNextId(), message.getId(), statusCode, apiVersion, messageData, message.getClient());
+        messageSize = HEADER_SIZE + (messageData != null ? messageData.length : 0);
     }
 
     /**
@@ -149,6 +181,64 @@ public class Message implements Externalizable {
      */
     public static long getNextId() {
         return ID_SEQUENCE.incrementAndGet();
+    }
+
+    public static int messageLength(ByteBuffer data) {
+        return data.getInt(MESSAGE_SIZE_OFFSET);
+    }
+
+    public static ByteBuffer pack(Message message) {
+        ByteBuffer buffer = ByteBuffer.allocate(message.getMessageSize());
+        buffer.putLong(MESSAGE_ID_OFFSET, message.getId());
+        buffer.putLong(REPLY_MESSAGE_ID_OFFSET, message.getReplyMessageId());
+        buffer.putInt(MESSAGE_SIZE_OFFSET, message.getMessageSize());
+        buffer.putInt(STATUS_CODE_OFFSET, message.getStatusCode().value());
+        buffer.putInt(API_VERSION_OFFSET, message.getApiVersion().getVersion());
+
+        if (message.getMessageData() != null) {
+            buffer.position(DATA_OFFSET);
+            buffer.put(message.getMessageData());
+        }
+
+        buffer.rewind();
+
+        return buffer;
+    }
+
+    public static Message unpack(ByteBuffer buffer) {
+        Timer timer = MetricsFactory.getMetrics().getTimer("network.message.unpack");
+
+        int msgSize = Message.messageLength(buffer);
+
+        Message message = new Message();
+
+        if (msgSize == HEADER_SIZE) {
+            message.id = buffer.getLong(MESSAGE_ID_OFFSET);
+            message.replyMessageId = buffer.getLong(REPLY_MESSAGE_ID_OFFSET);
+            message.statusCode = StatusCode.valueOf(buffer.getInt(STATUS_CODE_OFFSET));
+            message.apiVersion = ApiVersion.valueOf(buffer.getInt(API_VERSION_OFFSET));
+
+        } else {
+            int dataLength = msgSize - HEADER_SIZE;
+
+            Verify.verify(dataLength > 0);
+
+            byte[] data = new byte[dataLength];
+
+            for (int i = 0; i < dataLength; i++) {
+                data[i] = buffer.get(DATA_OFFSET + i);
+            }
+
+            message.id = buffer.getLong(MESSAGE_ID_OFFSET);
+            message.replyMessageId = buffer.getLong(REPLY_MESSAGE_ID_OFFSET);
+            message.statusCode = StatusCode.valueOf(buffer.getInt(STATUS_CODE_OFFSET));
+            message.apiVersion = ApiVersion.valueOf(buffer.getInt(API_VERSION_OFFSET));
+            message.messageData = data;
+        }
+
+        timer.stop();
+
+        return message;
     }
 
     public long getClient() {
@@ -181,7 +271,6 @@ public class Message implements Externalizable {
         return statusCode;
     }
 
-
     /**
      * Return id of reply message
      * <p>
@@ -201,41 +290,11 @@ public class Message implements Externalizable {
         return messageSize;
     }
 
-    public int getApiVersion() {
+    public ApiVersion getApiVersion() {
         return apiVersion;
     }
 
     public byte[] getMessageData() {
         return messageData;
     }
-
-    @Override
-    public void writeExternal(ObjectOutput out) throws IOException {
-        out.writeLong(getId());
-        out.writeLong(getReplyMessageId());
-        out.writeInt(getMessageSize());
-        out.writeInt(getStatusCode().value());
-        out.writeInt(getApiVersion());
-
-        if (messageData != null) {
-            out.write(messageData);
-        }
-    }
-
-    @Override
-    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-        id = in.readLong();
-        replyMessageId = in.readLong();
-        messageSize = in.readInt();
-        statusCode = StatusCode.valueOf(in.readInt());
-        apiVersion = in.readInt();
-
-        if (messageSize != HEADER_SIZE) {
-            messageData = new byte[messageSize - HEADER_SIZE];
-            in.readFully(messageData);
-        }
-
-    }
-
-
 }

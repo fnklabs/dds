@@ -2,7 +2,7 @@ package com.fnklabs.dds.coordinator;
 
 import com.fnklabs.dds.coordinator.partition.PartitionTable;
 import com.fnklabs.dds.network.ApiVersion;
-import com.fnklabs.dds.network.exception.ServerException;
+import com.fnklabs.dds.network.ServerException;
 import com.google.common.collect.Sets;
 import com.google.common.net.HostAndPort;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -78,7 +78,6 @@ public class ServerNodeTest {
     public void testSetUpInNewCluster() throws Exception {
 
         ClusterInformation clusterInformation = mock(ClusterInformation.class);
-        when(clusterInformation.getCoordinator()).thenReturn(new NodeInfo(UUID.randomUUID(), HostAndPort.fromString("127.0.0.1:1001"), 1, Node.NodeStatus.UP));
         when(clusterInformation.getCreated()).thenReturn(DateTime.now());
 
         SettableFuture<ClusterInformation> settableFuture = SettableFuture.<ClusterInformation>create();
@@ -168,7 +167,6 @@ public class ServerNodeTest {
         HostAndPort firstSeed = HostAndPort.fromString("127.0.0.1:10001");
 
         ClusterInformation clusterInformation = mock(ClusterInformation.class);
-        when(clusterInformation.getCoordinator()).thenReturn(new NodeInfo(UUID.randomUUID(), HostAndPort.fromString("127.0.0.1:1002"), 1, Node.NodeStatus.UP));
         when(clusterInformation.getCreated()).thenReturn(DateTime.now());
 
 
@@ -225,13 +223,12 @@ public class ServerNodeTest {
         HostAndPort thirdNode = HostAndPort.fromString("127.0.0.1:10002");
 
 
-        NodeInfo firstNodeInfo = new NodeInfo(UUID.randomUUID(), firstNode, ApiVersion.VERSION_1, Node.NodeStatus.UP);
-        NodeInfo secondNodeInfo = new NodeInfo(UUID.randomUUID(), secondNode, ApiVersion.VERSION_1, Node.NodeStatus.UP);
-        NodeInfo thirdNodeInfo = new NodeInfo(UUID.randomUUID(), thirdNode, ApiVersion.VERSION_1, Node.NodeStatus.UP);
+        NodeInfo firstNodeInfo = new NodeInfo(UUID.randomUUID(), firstNode, ApiVersion.VERSION_1.getVersion(), Node.NodeStatus.UP);
+        NodeInfo secondNodeInfo = new NodeInfo(UUID.randomUUID(), secondNode, ApiVersion.VERSION_1.getVersion(), Node.NodeStatus.UP);
+        NodeInfo thirdNodeInfo = new NodeInfo(UUID.randomUUID(), thirdNode, ApiVersion.VERSION_1.getVersion(), Node.NodeStatus.UP);
 
         ClusterInformation clusterInformation = mock(ClusterInformation.class);
-        when(clusterInformation.getCoordinator()).thenReturn(firstNodeInfo);
-        when(clusterInformation.getMembers()).thenReturn(new TreeSet<NodeInfo>(Sets.newHashSet(firstNodeInfo, secondNodeInfo)));
+        when(clusterInformation.getMembers()).thenReturn(new TreeSet<>(Sets.newHashSet(firstNodeInfo, secondNodeInfo)));
         when(clusterInformation.getCreated()).thenReturn(DateTime.now());
         when(clusterInformation.getPartitionTable()).thenReturn(mock(PartitionTable.class));
 
@@ -271,12 +268,20 @@ public class ServerNodeTest {
         serverNode.onSetUp();
 
         Assert.assertEquals(Node.NodeStatus.UP, serverNode.getNodeStatus());
+        Assert.assertNotNull(serverNode.getClusterInfo().get());
+        Assert.assertEquals(2, serverNode.getClusterInfo().get().getMembers().size());
 
+        ListenableFuture<ClusterInformation> clusterInformationListenableFuture = serverNode.nodeUp(thirdNodeInfo);
 
-        serverNode.nodeUp(thirdNodeInfo);
+        ClusterInformation clusterInformation1 = clusterInformationListenableFuture.get();
+
+        Assert.assertNotNull(clusterInformation1);
 
         Assert.assertEquals(Node.NodeStatus.REPAIR, serverNode.getNodeStatus());
-        Assert.assertEquals(ClusterStatus.INCONSISTENT, serverNode.getClusterStatus());
+
+        Assert.assertEquals(3, serverNode.getClusterInfo().get().getMembers().size());
+
+        Assert.assertEquals(ClusterStatus.REPAIR, serverNode.getClusterStatus());
     }
 
     @Test
@@ -310,5 +315,11 @@ public class ServerNodeTest {
 
 
         Assert.assertTrue(repair.get(1, TimeUnit.SECONDS));
+    }
+
+
+    @Test
+    public void testOnRepair() throws Exception {
+
     }
 }

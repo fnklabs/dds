@@ -19,11 +19,7 @@ import java.util.SortedSet;
 public class ClusterInformation implements Serializable, Comparable<ClusterInformation> {
 
     private static final long serialVersionUID = -5608399972816888801L;
-    /**
-     * Current cluster coordinator
-     */
-    @NotNull
-    private final NodeInfo coordinator;
+
 
     /**
      * Current cluster active members
@@ -38,12 +34,6 @@ public class ClusterInformation implements Serializable, Comparable<ClusterInfor
     private final NodeInfo sender;
 
     /**
-     * Current cluster status
-     */
-    @NotNull
-    private final ClusterStatus clusterStatus;
-
-    /**
      * Cluster partition table
      */
     @NotNull
@@ -56,21 +46,15 @@ public class ClusterInformation implements Serializable, Comparable<ClusterInfor
     private final DateTime created = DateTime.now();
 
     /**
-     * @param coordinator    Current cluster coordinator
      * @param members        Cluster active members
      * @param sender         Node Info about node that own current data
-     * @param clusterStatus  Current cluster status
      * @param partitionTable Cluster partition table
      */
-    public ClusterInformation(@NotNull NodeInfo coordinator,
-                              @NotNull SortedSet<NodeInfo> members,
+    public ClusterInformation(@NotNull SortedSet<NodeInfo> members,
                               @NotNull NodeInfo sender,
-                              @NotNull ClusterStatus clusterStatus,
                               @NotNull PartitionTable partitionTable) {
-        this.coordinator = coordinator;
         this.members = members;
         this.sender = sender;
-        this.clusterStatus = clusterStatus;
         this.partitionTable = partitionTable;
     }
 
@@ -85,18 +69,34 @@ public class ClusterInformation implements Serializable, Comparable<ClusterInfor
     }
 
     @NotNull
-    public NodeInfo getCoordinator() {
-        return coordinator;
-    }
-
-    @NotNull
     public SortedSet<NodeInfo> getMembers() {
         return Collections.unmodifiableSortedSet(members);
     }
 
     @NotNull
     public ClusterStatus getClusterStatus() {
-        return clusterStatus;
+
+        if (isUp()) {
+            return ClusterStatus.OK;
+        } else if (isRepair()) {
+            return ClusterStatus.REPAIR;
+        } else {
+            return ClusterStatus.UNKNOWN;
+        }
+    }
+
+    private boolean isRepair() {
+        return members.stream()
+                      .anyMatch(nodeInfo -> {
+                          return nodeInfo.getStatus() == Node.NodeStatus.REPAIR || nodeInfo.getStatus() == Node.NodeStatus.SYNCHRONIZATION;
+                      });
+    }
+
+    private boolean isUp() {
+        return members.stream()
+                      .allMatch(nodeInfo -> {
+                          return nodeInfo.getStatus() == Node.NodeStatus.UP;
+                      });
     }
 
     @NotNull
@@ -113,7 +113,6 @@ public class ClusterInformation implements Serializable, Comparable<ClusterInfor
     public String toString() {
         return MoreObjects
                 .toStringHelper(this)
-                .add("coordinator", getCoordinator())
                 .add("members", getMembers())
                 .add("cluster status", getClusterStatus())
                 .add("created", getCreated())

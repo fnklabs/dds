@@ -1,28 +1,17 @@
 package com.fnklabs.dds.coordinator;
 
-import com.fnklabs.dds.coordinator.exception.RequestException;
 import com.fnklabs.dds.coordinator.operation.*;
-import com.fnklabs.dds.network.Message;
-import com.fnklabs.dds.network.ResponseFuture;
-import com.fnklabs.dds.network.StatusCode;
-import com.fnklabs.dds.network.client.ClientFactory;
-import com.fnklabs.dds.network.client.NetworkClient;
-import com.fnklabs.dds.network.client.exception.ClientException;
+import com.fnklabs.dds.network.NetworkClient;
+import com.fnklabs.dds.network.ClientException;
 import com.google.common.base.Objects;
 import com.google.common.net.HostAndPort;
-import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.SettableFuture;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
-import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
-import java.util.function.Function;
 
 /**
  * Client to server node
@@ -59,17 +48,17 @@ class ServerNodeClient implements Node {
         this.remoteAddress = remoteAddress;
         this.executorService = executorService;
 
-        try {
-            NetworkClient build = ClientFactory.build(remoteAddress, new Consumer<Message>() {
-                @Override
-                public void accept(Message message) {
-                    LoggerFactory.getLogger(ServerNodeClient.class).debug("New system message: {}", message.getId());
-                }
-            });
-            networkClient.set(build);
-        } catch (ClientException e) {
-            LOGGER.warn("Can't connect to remote node", e);
-        }
+//        try {
+//            NetworkClient build = NetworkClientFactory.build(remoteAddress, new Consumer<Message>() {
+//                @Override
+//                public void accept(Message message) {
+//                    LoggerFactory.getLogger(ServerNodeClient.class).debug("New system message: {}", message.getId());
+//                }
+//            });
+//            networkClient.set(build);
+//        } catch (ClientException e) {
+//            LOGGER.warn("Can't connect to remote node", e);
+//        }
     }
 
     /**
@@ -152,9 +141,11 @@ class ServerNodeClient implements Node {
      */
     @Override
     public ListenableFuture<Long> ping() {
-        return Futures.transform(send(new Ping()), (Ping input) -> {
-            return input.getReceivedTime().getMillis() - input.getSendTime().getMillis();
-        }, executorService);
+//        return Futures.transform(send(new Ping()), (Ping input) -> {
+//            return input.getReceivedTime().getMillis() - input.getSendTime().getMillis();
+//        }, executorService);
+
+        return null;
     }
 
     /**
@@ -193,75 +184,77 @@ class ServerNodeClient implements Node {
      * @return Future for response
      */
     private <O, I extends Operation> ListenableFuture<O> send(@NotNull I data) {
-        return send(data, new Function<Message, O>() {
-            @Override
-            public O apply(Message message) {
-                if (message.getStatusCode() != StatusCode.OK) {
-                    throw new RequestException(message.getStatusCode());
-                }
+//        return send(data, new Function<Message, O>() {
+//            @Override
+//            public O apply(Message message) {
+//                if (message.getStatusCode() != StatusCode.OK) {
+//                    throw new RequestException(message.getStatusCode());
+//                }
+//
+//                try {
+//                    ObjectInputStream inputStream = new ObjectInputStream(new ByteArrayInputStream(message.getMessageData()));
+//                    return (O) inputStream.readObject();
+//                } catch (IOException | ClassNotFoundException e) {
+//                    LOGGER.warn("Can't unserialize response message");
+//
+//                    throw new RequestException(e);
+//                }
+//
+//            }
+//        });
 
-                try {
-                    ObjectInputStream inputStream = new ObjectInputStream(new ByteArrayInputStream(message.getMessageData()));
-                    return (O) inputStream.readObject();
-                } catch (IOException | ClassNotFoundException e) {
-                    LOGGER.warn("Can't unserialize response message");
-
-                    throw new RequestException(e);
-                }
-
-            }
-        });
+        return null;
     }
-
-    private <O, I extends Operation> ListenableFuture<O> send(@NotNull I data, @NotNull Function<Message, O> transformationFuture) {
-        try {
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            ObjectOutputStream objectOutputStream = new ObjectOutputStream(out);
-
-            objectOutputStream.writeObject(data);
-
-            return send(ByteBuffer.wrap(out.toByteArray()), transformationFuture);
-        } catch (IOException e) {
-            LOGGER.warn("Can't send message", e);
-
-            throw new RequestException(e);
-        }
-    }
-
-    private <O> ListenableFuture<O> send(@NotNull ByteBuffer data, @NotNull Function<Message, O> transformationFuture) {
-
-        try {
-            ResponseFuture send = getNetworkClient().send(data);
-            return Futures.transform(send, (Message input) -> {
-                return transformationFuture.apply(input);
-            }, executorService);
-
-        } catch (ClientException e) {
-            LOGGER.warn("Client problem", e);
-
-            SettableFuture<O> exceptionFuture = SettableFuture.<O>create();
-            exceptionFuture.setException(e);
-
-            return exceptionFuture;
-        }
-    }
-
-    @NotNull
-    private synchronized NetworkClient getNetworkClient() throws ClientException {
-        NetworkClient networkClient = this.networkClient.get();
-
-        if (networkClient == null) {
-            NetworkClient build = ClientFactory.build(remoteAddress, new Consumer<Message>() {
-                @Override
-                public void accept(Message message) {
-                    LoggerFactory.getLogger(ServerNodeClient.class).debug("New system message: {}", message.getId());
-                }
-            });
-
-            this.networkClient.set(build);
-
-        }
-        return this.networkClient.get();
-    }
+//
+//    private <O, I extends Operation> ListenableFuture<O> send(@NotNull I data, @NotNull Function<Message, O> transformationFuture) {
+//        try {
+//            ByteArrayOutputStream out = new ByteArrayOutputStream();
+//            ObjectOutputStream objectOutputStream = new ObjectOutputStream(out);
+//
+//            objectOutputStream.writeObject(data);
+//
+//            return send(ByteBuffer.wrap(out.toByteArray()), transformationFuture);
+//        } catch (IOException e) {
+//            LOGGER.warn("Can't send message", e);
+//
+//            throw new RequestException(e);
+//        }
+//    }
+//
+//    private <O> ListenableFuture<O> send(@NotNull ByteBuffer data, @NotNull Function<Message, O> transformationFuture) {
+//
+//        try {
+//            ResponseFuture send = getNetworkClient().send(data);
+//            return Futures.transform(send, (Message input) -> {
+//                return transformationFuture.apply(input);
+//            }, executorService);
+//
+//        } catch (ClientException e) {
+//            LOGGER.warn("Client problem", e);
+//
+//            SettableFuture<O> exceptionFuture = SettableFuture.<O>create();
+//            exceptionFuture.setException(e);
+//
+//            return exceptionFuture;
+//        }
+//    }
+//
+//    @NotNull
+//    private synchronized NetworkClient getNetworkClient() throws ClientException {
+//        NetworkClient networkClient = this.networkClient.get();
+//
+//        if (networkClient == null) {
+//            NetworkClient build = NetworkClientFactory.build(remoteAddress, new Consumer<Message>() {
+//                @Override
+//                public void accept(Message message) {
+//                    LoggerFactory.getLogger(ServerNodeClient.class).debug("New system message: {}", message.getId());
+//                }
+//            });
+//
+//            this.networkClient.set(build);
+//
+//        }
+//        return this.networkClient.get();
+//    }
 
 }
