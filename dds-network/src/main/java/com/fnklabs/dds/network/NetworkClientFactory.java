@@ -1,13 +1,13 @@
 package com.fnklabs.dds.network;
 
 import com.google.common.net.HostAndPort;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.util.function.Consumer;
 
-@Service
+@Slf4j
 public class NetworkClientFactory {
 
     /**
@@ -22,10 +22,9 @@ public class NetworkClientFactory {
      */
     public NetworkClient build(HostAndPort remoteAddress, Consumer<Message> messageConsumer) throws ClientException {
         try {
-            ;
             return new NetworkClient(remoteAddress, messageConsumer);
         } catch (IOException e) {
-            LoggerFactory.getLogger(NetworkClientFactory.class).warn("Can't build client connector", e);
+            log.warn("Can't build client connector", e);
         }
 
         throw new RemoteHostIsNotAvailable();

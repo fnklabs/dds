@@ -6,27 +6,35 @@ import com.google.common.net.HostAndPort;
 import com.google.common.util.concurrent.Futures;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import java.nio.ByteBuffer;
 import java.util.stream.IntStream;
 
 @Slf4j
-public class NetworkServerTest extends ApplicationTest {
-    @Autowired
+public class NetworkServerTest {
     private NetworkServer networkServer;
 
-    @Autowired
-    private HostAndPort hostAndPort;
-
-    @Autowired
     private NetworkClientFactory networkClientFactory;
+
+    private HostAndPort hostAndPort = HostAndPort.fromParts("127.0.0.1", 10_000);
+
+    @Before
+    public void setUp() throws Exception {
+        networkServer = new NetworkServer(hostAndPort, 4, new TestIncomeMessageHandler());
+        networkClientFactory = new NetworkClientFactory();
+    }
+
+    @After
+    public void tearDown() throws Exception {
+        networkServer.close();
+        MetricsFactory.getMetrics().report();
+    }
 
     @Test
     public void sync() throws Exception {
         NetworkClient client = networkClientFactory.build(hostAndPort, message -> log.debug("New message from server: {}", message));
-
 
         ByteBuffer dataBuffer = ByteBuffer.allocate(Integer.BYTES);
 
@@ -80,9 +88,5 @@ public class NetworkServerTest extends ApplicationTest {
         totalTimer.stop();
     }
 
-    @After
-    public void tearDown() throws Exception {
-        MetricsFactory.getMetrics().report();
 
-    }
 }

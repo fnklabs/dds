@@ -1,5 +1,6 @@
 package com.fnklabs.dds.network;
 
+import com.fnklabs.concurrent.ThreadFactory;
 import com.fnklabs.metrics.MetricsFactory;
 import com.fnklabs.metrics.Timer;
 import com.google.common.net.HostAndPort;
@@ -16,8 +17,7 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Queue;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -30,10 +30,6 @@ class NetworkServerConnector extends NetworkConnector implements Closeable {
     private static final AtomicLong CLIENT_ID_SEQUENCE = new AtomicLong(0);
 
     private final AtomicBoolean isRunning = new AtomicBoolean(false);
-
-    private final HostAndPort listenInterfaceAndPort;
-
-    private final ThreadPoolExecutor executorService;
 
     /**
      * Client incoming message buffer
@@ -50,11 +46,9 @@ class NetworkServerConnector extends NetworkConnector implements Closeable {
 
     private ServerSocketChannel serverSocketChannel;
 
-    NetworkServerConnector(HostAndPort listenInterfaceAndPort, ThreadPoolExecutor executorService, int selectors, Queue<Message> newRequestMessages) throws
-            IOException {
+
+    NetworkServerConnector(ExecutorService executorService, HostAndPort listenInterfaceAndPort, Queue<Message> newRequestMessages) throws IOException {
         super(executorService, newRequestMessages);
-        this.listenInterfaceAndPort = listenInterfaceAndPort;
-        this.executorService = executorService;
         this.newRequestMessages = newRequestMessages;
 
         LOGGER.info("Create server connector on {}", listenInterfaceAndPort);
@@ -68,13 +62,13 @@ class NetworkServerConnector extends NetworkConnector implements Closeable {
 
         isRunning.set(true);
 
-        for (int i = 0; i < selectors; i++) {
-            executorService.submit(() -> {
-                while (isRunning.get()) {
-                    processSelectorEvents();
-                }
-            });
-        }
+
+        executorService.submit(() -> {
+            while (isRunning.get()) {
+                processSelectorEvents();
+            }
+        });
+
     }
 
     /**

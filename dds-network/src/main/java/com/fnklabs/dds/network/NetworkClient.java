@@ -1,5 +1,7 @@
 package com.fnklabs.dds.network;
 
+import com.fnklabs.concurrent.*;
+import com.fnklabs.concurrent.Executors;
 import com.google.common.base.Verify;
 import com.google.common.net.HostAndPort;
 import lombok.extern.slf4j.Slf4j;
@@ -25,24 +27,25 @@ public class NetworkClient implements Closeable {
      */
     private final NetworkClientConnector connector;
 
-    private final Queue<Message> messageQueue = new ConcurrentLinkedQueue<>();
-
+    private final ExecutorService executorService = Executors.getThreadPoolExecutor(4, "network.client.worker");
+    private final ScheduledExecutorService scheduler = Executors.scheduler(1, "network.client.wd");
     /**
      * Response futures map
      */
     private Map<Long, ResponseFuture> responseFutures = new ConcurrentHashMap<>();
 
     NetworkClient(HostAndPort remoteAddress, Consumer<Message> unboundedMessageConsumer) throws IOException {
-
-        ThreadPoolExecutor executorService = getExecutorService();
+        Queue<Message> messageQueue = new ArrayBlockingQueue<>(500);
 
         connector = new NetworkClientConnector(
                 remoteAddress,
                 messageQueue,
-                executorService
+                Executors.getThreadPoolExecutor(1, "network.client.io")
         );
 
-        join(executorService, unboundedMessageConsumer);
+
+        executorService.submit(new NetworkClientWorker(messageQueue, unboundedMessageConsumer, responseFutures, isRunning, executorService));
+        scheduler.scheduleWithFixedDelay(new RemovePendingRequestTask(responseFutures, isRunning), 0, 100, TimeUnit.MILLISECONDS);
     }
 
     /**
@@ -75,25 +78,13 @@ public class NetworkClient implements Closeable {
     @Override
     public void close() {
         connector.close();
+
         isRunning.set(false);
+
+
+        executorService.shutdown();
+        scheduler.shutdown();
     }
 
-    private void join(ExecutorService executorService, Consumer<Message> messageConsumer) {
-        executorService.submit(new NetworkClientWorker(messageQueue, messageConsumer, responseFutures, isRunning));
 
-        ScheduledExecutorService scheduledThreadPool = Executors.newScheduledThreadPool(1, new com.fnklabs.concurrent.ThreadFactory("network-client-wd"));
-        scheduledThreadPool.scheduleWithFixedDelay(new RemovePendingRequestTask(responseFutures, isRunning), 0, 100, TimeUnit.MILLISECONDS);
-    }
-
-    private static ThreadPoolExecutor getExecutorService() {
-        return new ThreadPoolExecutor(
-                4,
-                4,
-                0L,
-                TimeUnit.SECONDS,
-                new ArrayBlockingQueue<Runnable>(500),
-                new com.fnklabs.concurrent.ThreadFactory("network-client-worker"),
-                new ThreadPoolExecutor.CallerRunsPolicy()
-        );
-    }
 }

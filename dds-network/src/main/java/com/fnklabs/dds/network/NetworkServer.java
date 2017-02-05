@@ -1,29 +1,25 @@
 package com.fnklabs.dds.network;
 
-import com.google.common.base.Verify;
+import com.fnklabs.concurrent.Executors;
+import com.fnklabs.concurrent.ThreadFactory;
 import com.google.common.net.HostAndPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Queue;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-@Service
-public class NetworkServer {
+public class NetworkServer implements Closeable {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(NetworkServer.class);
 
     private final AtomicBoolean isRunning = new AtomicBoolean(true);
-
-    private final IncomeMessageHandler incomeMessageHandler;
 
     /**
      * Local pool executor
@@ -36,36 +32,23 @@ public class NetworkServer {
     /**
      * Initialize network server but does not start it
      *
-     * @param workerPoolExecutor
      * @param incomeMessageHandler New message handler
      */
-    @Autowired
-    NetworkServer(
-            @Qualifier("network.server.listeningAddress") HostAndPort listenAddress,
-            @Qualifier("network.server.pool") ThreadPoolExecutor workerPoolExecutor,
-            @Value("${network.server.workers:4}") int workers,
-            @Value("${network.server.selectors:1}") int selectors,
-            IncomeMessageHandler incomeMessageHandler) throws IOException {
+    NetworkServer(HostAndPort listenAddress, int workers, IncomeMessageHandler incomeMessageHandler) throws IOException {
+        Queue<Message> msgQueue = new ArrayBlockingQueue<>(10_000);
 
+        this.workerPoolExecutor = Executors.getThreadPoolExecutor(workers + 1, "network.server.worker");
+        this.networkServerConnector = new NetworkServerConnector(Executors.getThreadPoolExecutor(1, "network.server.io"), listenAddress, msgQueue);
 
-        Queue<Message> msgQueue = new ArrayBlockingQueue<Message>(100_000);
+        workerPoolExecutor.submit(new NetworkServerWorker(msgQueue, isRunning, incomeMessageHandler, this::onNewReply, workerPoolExecutor));
+    }
 
-        this.incomeMessageHandler = incomeMessageHandler;
-        this.workerPoolExecutor = workerPoolExecutor;
-        this.networkServerConnector = new NetworkServerConnector(listenAddress, workerPoolExecutor, selectors, msgQueue);
+    @Override
+    public void close() throws IOException {
+        isRunning.set(false);
+        networkServerConnector.close();
 
-        Verify.verify(workerPoolExecutor.getMaximumPoolSize() >= workers + selectors);
-
-        for (int i = 0; i < workers; i++) {
-            workerPoolExecutor.submit(
-                    new NetworkServerWorker(
-                            msgQueue,
-                            isRunning,
-                            incomeMessageHandler,
-                            this::onNewReply
-                    )
-            );
-        }
+        workerPoolExecutor.shutdown();
     }
 
     /**

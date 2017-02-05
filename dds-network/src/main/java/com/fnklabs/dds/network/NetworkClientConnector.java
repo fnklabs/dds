@@ -64,6 +64,8 @@ class NetworkClientConnector extends NetworkConnector implements Closeable {
         }
 
         LOGGER.info("Close connector: {}", remoteAddress);
+
+        executorService.shutdown();
     }
 
     /**
@@ -88,7 +90,6 @@ class NetworkClientConnector extends NetworkConnector implements Closeable {
     private void processSelectorEvents() {
         Set<SelectionKey> keys = selectNewEvents();
 
-
         for (SelectionKey key : keys) {
             SocketChannel clientSocketChannel = (SocketChannel) key.channel();
 
@@ -106,7 +107,6 @@ class NetworkClientConnector extends NetworkConnector implements Closeable {
 
             keys.remove(key);
         }
-
     }
 
     /**
@@ -115,7 +115,7 @@ class NetworkClientConnector extends NetworkConnector implements Closeable {
      * @throws IOException
      */
     private void open() throws IOException {
-        LOGGER.warn("Building client: {}:{}", remoteAddress);
+        LOGGER.warn("Building client: {}", remoteAddress);
 
         channel = SocketChannel.open();
         channel.setOption(StandardSocketOptions.TCP_NODELAY, true);

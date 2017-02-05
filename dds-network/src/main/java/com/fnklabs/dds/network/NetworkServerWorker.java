@@ -12,6 +12,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.nio.ByteBuffer;
 import java.util.Queue;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 
@@ -41,24 +42,17 @@ class NetworkServerWorker implements Runnable {
      */
     private final BiConsumer<Long, Message> responseConsumer;
 
+    private final ExecutorService executorService;
+
     @Override
     public void run() {
-        Metrics metrics = MetricsFactory.getMetrics();
-
         while (isRunning.get()) {
             Message message = messagesQueue.poll();
 
             if (message != null) {
-
-                Timer timer = metrics.getTimer("network.server.message.process");
-
                 log.debug("Received new message: {}", message);
 
-                try {
-                    onMessage(message, timer);
-                } catch (Exception e) {
-                    log.warn("Can't process message", message, e);
-                }
+                executorService.submit(() -> onMessage(message));
             }
         }
     }
@@ -66,7 +60,9 @@ class NetworkServerWorker implements Runnable {
     /**
      * Process new messages from queue
      */
-    private void onMessage(Message message, Timer timer) {
+    private void onMessage(Message message) {
+        Timer timer = MetricsFactory.getMetrics().getTimer("network.server.message.process");
+
         ListenableFuture<ByteBuffer> handle = incomeMessageHandler.handle(ByteBuffer.wrap(message.getMessageData()));
 
         Futures.addCallback(handle, new FutureCallback<ByteBuffer>() {
