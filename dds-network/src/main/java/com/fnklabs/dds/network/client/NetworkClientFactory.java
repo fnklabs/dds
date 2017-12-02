@@ -1,8 +1,9 @@
-package com.fnklabs.dds.network;
+package com.fnklabs.dds.network.client;
 
+import com.fnklabs.dds.network.RemoteHostIsNotAvailable;
+import com.fnklabs.dds.network.ReplyMessage;
 import com.google.common.net.HostAndPort;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.function.Consumer;
@@ -20,7 +21,7 @@ public class NetworkClientFactory {
      *
      * @throws ClientException if can't connect to remote host
      */
-    public NetworkClient build(HostAndPort remoteAddress, Consumer<Message> messageConsumer) throws ClientException {
+    public NetworkClient build(HostAndPort remoteAddress, Consumer<ReplyMessage> messageConsumer) throws ClientException {
         try {
             return new NetworkClient(remoteAddress, messageConsumer);
         } catch (IOException e) {

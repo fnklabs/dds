@@ -1,5 +1,7 @@
-package com.fnklabs.dds.network;
+package com.fnklabs.dds.network.client;
 
+import com.fnklabs.dds.network.ReplyMessage;
+import com.fnklabs.dds.network.ResponseFuture;
 import com.fnklabs.metrics.MetricsFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,9 +18,9 @@ import java.util.function.Consumer;
 @Slf4j
 @RequiredArgsConstructor
 class NetworkClientWorker implements Runnable {
-    private final Queue<Message> inputMessages;
+    private final Queue<ReplyMessage> inputMessages;
 
-    private final Consumer<Message> unboundMessageConsumer;
+    private final Consumer<ReplyMessage> unboundMessageConsumer;
 
     private final Map<Long, ResponseFuture> responseFutureMap;
 
@@ -29,7 +31,7 @@ class NetworkClientWorker implements Runnable {
     @Override
     public void run() {
         while (isRunning.get()) {
-            Message message = inputMessages.poll();
+            ReplyMessage message = inputMessages.poll();
 
             if (message != null) {
                 log.debug("Received new message: {}", message);
@@ -39,13 +41,13 @@ class NetworkClientWorker implements Runnable {
         }
     }
 
-    private void onNewMessage(Message message) {
+    private void onNewMessage(ReplyMessage message) {
         MetricsFactory.getMetrics().getCounter("network.client.worker.message").inc();
 
-        ResponseFuture responseFuture = responseFutureMap.get(message.getReplyMessageId());
+        ResponseFuture responseFuture = responseFutureMap.get(message.replyId());
 
         if (responseFuture == null) {
-            throw new RuntimeException(String.format("Message id `%d` doesn't exists", message.getReplyMessageId()));
+            throw new RuntimeException(String.format("BaseMessage id `%d` doesn't exists", message.replyId()));
 //            unboundMessageConsumer.accept(message);
         }
 

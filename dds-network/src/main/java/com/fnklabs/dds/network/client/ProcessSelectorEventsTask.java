@@ -1,7 +1,7 @@
-package com.fnklabs.dds.network;
+package com.fnklabs.dds.network.client;
 
+import com.fnklabs.dds.network.client.NetworkClientConnector;
 import lombok.RequiredArgsConstructor;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;

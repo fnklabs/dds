@@ -8,9 +8,9 @@
     </appender>
 
 
-    <!--<logger name="com.fnklabs">-->
-        <!--<level value="info"/>-->
-    <!--</logger>-->
+    <logger name="com.fnklabs">
+        <level value="info"/>
+    </logger>
 
     <root level="info">
         <appender-ref ref="STDOUT"/>

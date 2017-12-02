@@ -1,9 +1,12 @@
-package com.fnklabs.dds.network;
+package com.fnklabs.dds.network.client;
 
-import com.fnklabs.concurrent.*;
 import com.fnklabs.concurrent.Executors;
-import com.google.common.base.Verify;
+import com.fnklabs.dds.network.*;
+import com.fnklabs.metrics.MetricsFactory;
+import com.fnklabs.metrics.Timer;
 import com.google.common.net.HostAndPort;
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.Closeable;
@@ -27,20 +30,20 @@ public class NetworkClient implements Closeable {
      */
     private final NetworkClientConnector connector;
 
-    private final ExecutorService executorService = Executors.getThreadPoolExecutor(4, "network.client.worker");
+    private final ExecutorService executorService = Executors.fixedPoolExecutor(4, "network.client.worker");
     private final ScheduledExecutorService scheduler = Executors.scheduler(1, "network.client.wd");
     /**
      * Response futures map
      */
     private Map<Long, ResponseFuture> responseFutures = new ConcurrentHashMap<>();
 
-    NetworkClient(HostAndPort remoteAddress, Consumer<Message> unboundedMessageConsumer) throws IOException {
-        Queue<Message> messageQueue = new ArrayBlockingQueue<>(500);
+    NetworkClient(HostAndPort remoteAddress, Consumer<ReplyMessage> unboundedMessageConsumer) throws IOException {
+        Queue<ReplyMessage> messageQueue = new ArrayBlockingQueue<>(500);
 
         connector = new NetworkClientConnector(
                 remoteAddress,
                 messageQueue,
-                Executors.getThreadPoolExecutor(1, "network.client.io")
+                Executors.fixedPoolExecutor(1, "network.client.io")
         );
 
 
@@ -54,23 +57,34 @@ public class NetworkClient implements Closeable {
      * @throws RequestException if send request message
      */
     public ResponseFuture send(ByteBuffer data) throws RequestException {
-        Message message = new Message(StatusCode.OK, ApiVersion.VERSION_1, data.array());
+        Timer timer = MetricsFactory.getMetrics().getTimer("network.client.send");
+
+        RequestMessage message = new RequestMessage(RequestMessage.ID.incrementAndGet(), ApiVersion.CURRENT, data.array());
 
         log.debug("Sending message: {}", message);
 
-        ByteBuffer msgData = Message.pack(message);
+        ByteBuffer buffer = ByteBuffer.allocate(message.getSize());
 
-        Verify.verify(
-                message.getMessageSize() == Message.messageLength(msgData),
-                "Expected messages size: %s but was %s",
-                message.getMessageSize(),
-                Message.messageLength(msgData)
-        );
+        message.read(buffer);
+
+        buffer.rewind();
 
         ResponseFuture responseFuture = new ResponseFuture(message);
+
+        Futures.addCallback(responseFuture, new FutureCallback<ReplyMessage>() {
+            @Override
+            public void onSuccess(ReplyMessage result) {
+                timer.stop();
+            }
+
+            @Override
+            public void onFailure(Throwable t) {
+                timer.stop();
+            }
+        });
         responseFutures.put(message.getId(), responseFuture);
 
-        connector.send(msgData);
+        connector.send(buffer);
 
         return responseFuture;
     }

@@ -1,19 +1,21 @@
 package com.fnklabs.dds.network;
 
-import com.fnklabs.dds.network.StatusCode;
-
 public class RequestException extends RuntimeException {
     private StatusCode statusCode = StatusCode.UNKNOWN;
+
+    public RequestException() {
+    }
 
     public RequestException(StatusCode statusCode) {
         this.statusCode = statusCode;
     }
 
-    public RequestException() {
-    }
-
     public RequestException(Throwable cause) {
         super(cause);
+    }
+
+    public RequestException(String message) {
+        super(message);
     }
 
     public StatusCode getStatusCode() {

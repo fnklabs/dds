@@ -8,13 +8,13 @@ import org.jetbrains.annotations.Nullable;
 import java.util.concurrent.TimeUnit;
 
 @RequiredArgsConstructor
-public class ResponseFuture extends AbstractFuture<Message> {
-    private static final int TIMEOUT = 30_000;
-    private final Message message;
+public class ResponseFuture extends AbstractFuture<ReplyMessage> {
+    private static final int TIMEOUT = 35_000;
+    private final RequestMessage message;
 
     private final long createdAt = System.nanoTime();
 
-    public void onResponse(Message connectorMessage) {
+    public void onResponse(ReplyMessage connectorMessage) {
         set(connectorMessage);
     }
 
@@ -23,7 +23,7 @@ public class ResponseFuture extends AbstractFuture<Message> {
     }
 
     public void onTimeout(@Nullable HostAndPort address, long latency, int retryCount) {
-        setException(new TimeoutException(message));
+        setException(new TimeoutException(message, TimeUnit.MILLISECONDS.convert(latency, TimeUnit.NANOSECONDS)));
     }
 
     public boolean isExpired() {

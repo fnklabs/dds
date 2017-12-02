@@ -5,7 +5,7 @@ package com.fnklabs.dds.network;
  */
 public enum StatusCode {
     /**
-     * Message was successfully processed
+     * BaseMessage was successfully processed
      */
     OK(0),
 

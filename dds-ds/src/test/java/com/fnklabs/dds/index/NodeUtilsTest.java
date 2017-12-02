@@ -1,5 +1,7 @@
 package com.fnklabs.dds.storage;
 
+import com.fnklabs.dds.index.Node;
+import com.fnklabs.dds.index.NodeUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -7,8 +9,6 @@ import org.junit.Test;
 
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
-
-import static org.junit.Assert.*;
 
 public class NodeUtilsTest {
 

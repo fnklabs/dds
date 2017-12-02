@@ -1,6 +1,6 @@
 package com.fnklabs.dds.storage;
 
-import com.fnklabs.dds.BytesUtils;
+import com.fnklabs.dds.index.Node;
 import org.junit.Assert;
 import org.junit.Test;
 

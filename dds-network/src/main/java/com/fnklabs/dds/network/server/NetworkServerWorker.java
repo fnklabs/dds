@@ -1,6 +1,9 @@
-package com.fnklabs.dds.network;
+package com.fnklabs.dds.network.server;
 
-import com.fnklabs.metrics.Metrics;
+import com.fnklabs.dds.network.ApiVersion;
+import com.fnklabs.dds.network.ReplyMessage;
+import com.fnklabs.dds.network.RequestMessage;
+import com.fnklabs.dds.network.StatusCode;
 import com.fnklabs.metrics.MetricsFactory;
 import com.fnklabs.metrics.Timer;
 import com.google.common.util.concurrent.FutureCallback;
@@ -12,7 +15,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.nio.ByteBuffer;
 import java.util.Queue;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 
@@ -27,7 +29,7 @@ class NetworkServerWorker implements Runnable {
     /**
      * New request queue
      */
-    private final Queue<Message> messagesQueue;
+    private final Queue<RequestMessage> messagesQueue;
 
     /**
      * Is running
@@ -40,19 +42,18 @@ class NetworkServerWorker implements Runnable {
     /**
      * Response consumer
      */
-    private final BiConsumer<Long, Message> responseConsumer;
+    private final BiConsumer<Long, ReplyMessage> responseConsumer;
 
-    private final ExecutorService executorService;
 
     @Override
     public void run() {
         while (isRunning.get()) {
-            Message message = messagesQueue.poll();
+            RequestMessage message = messagesQueue.poll();
 
             if (message != null) {
                 log.debug("Received new message: {}", message);
 
-                executorService.submit(() -> onMessage(message));
+                onMessage(message);
             }
         }
     }
@@ -60,10 +61,10 @@ class NetworkServerWorker implements Runnable {
     /**
      * Process new messages from queue
      */
-    private void onMessage(Message message) {
+    private void onMessage(RequestMessage message) {
         Timer timer = MetricsFactory.getMetrics().getTimer("network.server.message.process");
 
-        ListenableFuture<ByteBuffer> handle = incomeMessageHandler.handle(ByteBuffer.wrap(message.getMessageData()));
+        ListenableFuture<ByteBuffer> handle = incomeMessageHandler.handle(ByteBuffer.wrap(message.getData()));
 
         Futures.addCallback(handle, new FutureCallback<ByteBuffer>() {
             @Override
@@ -72,11 +73,11 @@ class NetworkServerWorker implements Runnable {
 
                 log.debug("Reply {} on {}", data, message);
 
-                Message msg = new Message(message.getId(), StatusCode.OK, ApiVersion.CURRENT, data);
+                ReplyMessage msg = new ReplyMessage(ReplyMessage.ID.incrementAndGet(), ApiVersion.CURRENT, message.getId(), data);
 
                 timer.stop();
 
-                responseConsumer.accept(message.getClient(), msg);
+                responseConsumer.accept(message.getSessionId(), msg);
             }
 
             @Override
@@ -84,7 +85,7 @@ class NetworkServerWorker implements Runnable {
                 log.warn("Cant process message: {}", message, t);
                 timer.stop();
 
-                responseConsumer.accept(message.getClient(), new Message(message.getId(), StatusCode.UNKNOWN, ApiVersion.CURRENT, null));
+                responseConsumer.accept(message.getSessionId(), new ReplyMessage(ReplyMessage.ID.incrementAndGet(), ApiVersion.CURRENT, message.getId(), StatusCode.OK, null));
             }
         });
     }

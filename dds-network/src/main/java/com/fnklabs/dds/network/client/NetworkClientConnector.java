@@ -1,8 +1,10 @@
-package com.fnklabs.dds.network;
+package com.fnklabs.dds.network.client;
 
+import com.fnklabs.dds.network.*;
+import com.fnklabs.metrics.MetricsFactory;
+import com.fnklabs.metrics.Timer;
 import com.google.common.net.HostAndPort;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -13,17 +15,17 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.Queue;
 import java.util.Set;
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
-class NetworkClientConnector extends NetworkConnector implements Closeable {
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(NetworkClientConnector.class);
+@Slf4j
+class NetworkClientConnector extends NetworkConnector<ReplyMessage> implements Closeable {
 
     /**
      * New (not process) messages from server for processing
      */
-    private final Queue<Message> messageQueue;
+    private final Queue<ReplyMessage> messageQueue;
 
     /**
      * Remote server address
@@ -38,13 +40,13 @@ class NetworkClientConnector extends NetworkConnector implements Closeable {
     /**
      * Incoming messages messageBuffer
      */
-    private final ByteBuffer messageBuffer = ByteBuffer.allocate(Message.MAX_MESSAGE_SIZE);
+    private final ByteBuffer messageBuffer = ByteBuffer.allocate(ApiVersion.CURRENT.MAX_MESSAGE_SIZE);
     /**
      * Client channel
      */
     private SocketChannel channel;
 
-    NetworkClientConnector(HostAndPort remoteAddress, Queue<Message> messageQueue, ExecutorService executorService) throws IOException {
+    NetworkClientConnector(HostAndPort remoteAddress, Queue<ReplyMessage> messageQueue, ExecutorService executorService) throws IOException {
         super(executorService, messageQueue);
         this.remoteAddress = remoteAddress;
         this.messageQueue = messageQueue;
@@ -60,10 +62,10 @@ class NetworkClientConnector extends NetworkConnector implements Closeable {
         try {
             channel.close();
         } catch (IOException e) {
-            LOGGER.warn("Cant close socket", e);
+            log.warn("Cant close socket", e);
         }
 
-        LOGGER.info("Close connector: {}", remoteAddress);
+        log.info("Close connector: {}", remoteAddress);
 
         executorService.shutdown();
     }
@@ -77,10 +79,27 @@ class NetworkClientConnector extends NetworkConnector implements Closeable {
         try {
             int writtenBytes = write(data);
 
-            LOGGER.debug("send `{}` bytes", writtenBytes);
+            log.debug("send `{}` bytes", writtenBytes);
 
         } catch (HostNotAvailableException e) {
-            LOGGER.error("Can't send data to server", e);
+            log.error("Can't send data to server", e);
+        }
+    }
+
+    @Override
+    protected void readMessagesFromBuffer(ByteBuffer messageBuffer, Consumer<ReplyMessage> newMessageHandler) {
+        while (messageBuffer.remaining() >= Message.HEADER_SIZE) { // read all from buffer
+            try (Timer timer = MetricsFactory.getMetrics().getTimer("network.client.connector.buffer.write")) {
+                ReplyMessage message = new ReplyMessage();
+                message.write(messageBuffer);
+
+                newMessageHandler.accept(message);
+
+                log.debug("Buffer: {}", messageBuffer);
+
+            } catch (Exception e) {
+                log.warn("can't write message from buffer", e);
+            }
         }
     }
 
@@ -99,11 +118,16 @@ class NetworkClientConnector extends NetworkConnector implements Closeable {
 
             try {
                 readFromChannel(clientSocketChannel, messageBuffer);
+
+                messageBuffer.flip();
+
+                readMessagesFromBuffer(messageBuffer, messageQueue::add);
+
+                messageBuffer.compact();
             } catch (ChannelClosedException e) {
                 closeChannel(key, clientSocketChannel);
             }
 
-            readMessagesFromBuffer(messageBuffer, messageQueue::add);
 
             keys.remove(key);
         }
@@ -115,7 +139,7 @@ class NetworkClientConnector extends NetworkConnector implements Closeable {
      * @throws IOException
      */
     private void open() throws IOException {
-        LOGGER.warn("Building client: {}", remoteAddress);
+        log.warn("Building client: {}", remoteAddress);
 
         channel = SocketChannel.open();
         channel.setOption(StandardSocketOptions.TCP_NODELAY, true);

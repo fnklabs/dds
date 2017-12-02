@@ -1,5 +1,6 @@
-package com.fnklabs.dds.network;
+package com.fnklabs.dds.network.server;
 
+import com.fnklabs.dds.network.Message;
 import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor

@@ -1,4 +1,4 @@
-package com.fnklabs.dds.storage;
+package com.fnklabs.dds.index;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -8,7 +8,6 @@ import java.nio.channels.FileLock;
 class IOUtils {
     static int read(FileChannel fileChannel, ByteBuffer buffer, long position) throws IOException {
         return fileChannel.read(buffer, position);
-
     }
 
     static int write(FileChannel fileChannel, ByteBuffer buffer, long position) throws IOException {

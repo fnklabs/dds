@@ -1,11 +1,16 @@
-package com.fnklabs.dds.network;
+package com.fnklabs.dds.network.server;
 
+import com.fnklabs.dds.network.ReplyMessage;
+import com.fnklabs.dds.network.ResponseFuture;
+import com.fnklabs.dds.network.client.NetworkClient;
+import com.fnklabs.dds.network.client.NetworkClientFactory;
 import com.fnklabs.metrics.MetricsFactory;
 import com.fnklabs.metrics.Timer;
 import com.google.common.net.HostAndPort;
 import com.google.common.util.concurrent.Futures;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -23,6 +28,8 @@ public class NetworkServerTest {
     @Before
     public void setUp() throws Exception {
         networkServer = new NetworkServer(hostAndPort, 4, new TestIncomeMessageHandler());
+        networkServer.run();
+
         networkClientFactory = new NetworkClientFactory();
     }
 
@@ -49,9 +56,13 @@ public class NetworkServerTest {
 
             log.debug("Awaiting message: {}", i);
 
-            future.get();
+            ReplyMessage replyMessage = future.get();
 
             timer.stop();
+
+            ByteBuffer data = ByteBuffer.wrap(replyMessage.getData());
+
+            Assert.assertEquals(i, data.getInt());
 
             log.debug("Send message: `{}` in {}", i, timer);
 
@@ -77,9 +88,13 @@ public class NetworkServerTest {
 
                  log.debug("Awaiting message: {}", message);
 
-                 Futures.getUnchecked(future);
+                 ReplyMessage replyMessage = Futures.getUnchecked(future);
 
                  timer.stop();
+
+                 ByteBuffer data = ByteBuffer.wrap(replyMessage.getData());
+
+                 Assert.assertEquals(message, data.getInt());
 
                  log.debug("Send message: `{}` in {}", message, timer);
              });

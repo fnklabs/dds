@@ -1,5 +1,6 @@
-package com.fnklabs.dds.network;
+package com.fnklabs.dds.network.server;
 
+import com.fnklabs.dds.network.server.IncomeMessageHandler;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import lombok.extern.slf4j.Slf4j;

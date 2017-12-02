@@ -1,5 +1,6 @@
-package com.fnklabs.dds.network;
+package com.fnklabs.dds.network.server;
 
+import com.fnklabs.dds.network.server.NetworkServerWorker;
 import com.google.common.util.concurrent.ListenableFuture;
 
 import java.nio.ByteBuffer;
@@ -11,7 +12,7 @@ public interface IncomeMessageHandler {
     /**
      * Handle and process new message from server
      *
-     * @param message Message data
+     * @param message BaseMessage data
      *
      * @return Future for response data
      */

@@ -1,7 +1,6 @@
 dependencies {
     compile "org.projectlombok:lombok:$vers.lombok"
 
-
     compile "ch.qos.logback:logback-core:$vers.logback"
     compile 'ch.qos.logback:logback-classic:$vers.logback'
 
@@ -17,7 +16,7 @@ dependencies {
     compile "com.fnklabs:fnklabs-metrics-codahale:$vers.metrics"
 
 
-    testCompile "junit:junit:4.12"
+    testCompile "junit:junit:$vers.junit"
     testCompile "org.mockito:mockito-core:$vers.mockito"
     testCompile "org.springframework:spring-test:$vers.spring"
 

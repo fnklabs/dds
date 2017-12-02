@@ -1,5 +1,6 @@
 package com.fnklabs.dds.network;
 
+import com.fnklabs.metrics.Metrics;
 import com.fnklabs.metrics.MetricsFactory;
 import com.fnklabs.metrics.Timer;
 import com.google.common.base.Verify;
@@ -7,10 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.ClosedChannelException;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
-import java.nio.channels.SocketChannel;
+import java.nio.channels.*;
 import java.nio.channels.spi.AbstractSelectableChannel;
 import java.util.Collections;
 import java.util.Queue;
@@ -19,14 +17,15 @@ import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 
 @Slf4j
-abstract class NetworkConnector {
+public abstract class NetworkConnector<T extends Message> {
+    private static final Metrics METRICS = MetricsFactory.getMetrics();
     private final Selector selector = Selector.open();
 
-    private final Queue<Message> messageQueue;
+    private final Queue<T> messageQueue;
 
     private final ExecutorService executorService;
 
-    NetworkConnector(ExecutorService executorService, Queue<Message> messageQueue) throws IOException {
+    public NetworkConnector(ExecutorService executorService, Queue<T> messageQueue) throws IOException {
         this.executorService = executorService;
         this.messageQueue = messageQueue;
     }
@@ -39,44 +38,14 @@ abstract class NetworkConnector {
      *
      * @return
      */
-    SelectionKey register(AbstractSelectableChannel channel, int operation) throws ClosedChannelException {
+    protected SelectionKey register(AbstractSelectableChannel channel, int operation) throws ClosedChannelException {
         return channel.register(selector, operation);
     }
 
-    void readMessagesFromBuffer(ByteBuffer messageBuffer, Consumer<Message> newMessageHandler) {
-        for (; ; ) {
-            try (Timer timer = MetricsFactory.getMetrics().getTimer("network.connector.buffer.read")) {
-                int messageLength = Message.messageLength(messageBuffer);
-
-                 /*  If all data was read */
-                int messageBufferCurrentPosition = messageBuffer.position();
-
-                if (messageLength <= messageBufferCurrentPosition) {
-                    messageBuffer.position(0);
-
-                    Message clientMessage = Message.unpack(messageBuffer);
-
-                    if (messageLength < messageBufferCurrentPosition) { // copy next message data
-                        for (int i = messageLength; i < messageBufferCurrentPosition; i++) {
-                            int shiftIndex = i - messageLength;
-                            messageBuffer.put(shiftIndex, messageBuffer.get(i));
-                        }
-
-                        messageBuffer.position(messageBufferCurrentPosition - messageLength);
-                    }
+    protected abstract void readMessagesFromBuffer(ByteBuffer messageBuffer, Consumer<T> newMessageHandler);
 
 
-                    newMessageHandler.accept(clientMessage);
-                } else {
-                    break;
-                }
-            } catch (Exception e) {
-                log.warn("can't read message from buffer", e);
-            }
-        }
-    }
-
-    void closeChannel(SelectionKey key, SocketChannel clientSocketChannel) {
+    public static void closeChannel(SelectionKey key, SelectableChannel clientSocketChannel) {
         try {
             key.cancel();
             clientSocketChannel.close();
@@ -85,7 +54,7 @@ abstract class NetworkConnector {
         }
     }
 
-    Set<SelectionKey> selectNewEvents() {
+    protected Set<SelectionKey> selectNewEvents() {
         try {
             int select = selector.select();
 
@@ -103,11 +72,11 @@ abstract class NetworkConnector {
         return Collections.emptySet();
     }
 
-    protected void readFromChannel(SocketChannel socketChannel, ByteBuffer buffer) throws ChannelClosedException {
-        try (Timer timer = MetricsFactory.getMetrics().getTimer("network.connector.channel.read")) {
+    public static int readFromChannel(SocketChannel socketChannel, ByteBuffer buffer) throws ChannelClosedException {
+        try (Timer timer = METRICS.getTimer("network.connector.channel.write")) {
             int receivedBytes = socketChannel.read(buffer);
 
-            MetricsFactory.getMetrics().getCounter("network.connector.channel.in").inc(receivedBytes);
+            METRICS.getCounter("network.connector.channel.in").inc(receivedBytes);
 
             log.debug("received `{}` bytes: from {}", receivedBytes, socketChannel.getRemoteAddress());
 
@@ -115,10 +84,13 @@ abstract class NetworkConnector {
             if (receivedBytes == -1) {
                 throw new ChannelClosedException(socketChannel);
             }
+
+            return receivedBytes;
         } catch (IOException e) {
-            log.error("Can't read from channel {}/{}", socketChannel, e);
+            log.error("Can't write from channel {}/{}", socketChannel, e);
         }
 
+        return 0;
     }
 
 
@@ -129,20 +101,20 @@ abstract class NetworkConnector {
      *
      * @throws HostNotAvailableException if cant send data
      */
-    protected int write(SocketChannel socketChannel, ByteBuffer data) throws HostNotAvailableException {
+    public static int write(SocketChannel socketChannel, ByteBuffer data) throws HostNotAvailableException {
 
-        try (Timer timer = MetricsFactory.getMetrics().getTimer("network.connector.channel.write")) {
+        try (Timer timer = METRICS.getTimer("network.connector.channel.write")) {
             int writtenData = socketChannel.write(data);
 
-            MetricsFactory.getMetrics().getCounter("network.connector.channel.out").inc(writtenData);
+            METRICS.getCounter("network.connector.channel.out").inc(writtenData);
 
             log.debug("Written `{}` bytes to channel: {}", writtenData, socketChannel.getRemoteAddress());
 
+            Verify.verify(Integer.compare(data.limit(), writtenData) == 0, "Not all data was written to channel %s of %s", writtenData, data.limit());
 
-            Verify.verify(Integer.compare(data.limit(), writtenData) == 0);
             return writtenData;
         } catch (IOException e) {
-            log.warn("Cant write data to channel {}", socketChannel, e);
+            log.warn("Cant read data to channel {}", socketChannel, e);
 
             throw new HostNotAvailableException();
         }

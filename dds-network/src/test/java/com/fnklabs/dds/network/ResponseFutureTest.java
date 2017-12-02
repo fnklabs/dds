@@ -14,12 +14,12 @@ public class ResponseFutureTest {
 
 //    @Test
 //    public void testOnResponse() throws Exception {
-//        Message message = Mockito.mock(Message.class);
+//        BaseMessage message = Mockito.mock(BaseMessage.class);
 //
 //        ResponseFuture responseFuture = new ResponseFuture();
 //        responseFuture.onResponse(message);
 //
-//        Message responseMessage = responseFuture.get(1, TimeUnit.SECONDS);
+//        BaseMessage responseMessage = responseFuture.get(1, TimeUnit.SECONDS);
 //
 //        Assert.assertNotNull(responseMessage);
 //        Assert.assertEquals(message, responseMessage);

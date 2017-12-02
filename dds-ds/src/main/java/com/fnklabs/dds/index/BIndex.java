@@ -1,6 +1,5 @@
 package com.fnklabs.dds.storage;
 
-import com.codahale.metrics.Timer;
 import com.fnklabs.dds.BytesUtils;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -36,7 +35,6 @@ class BIndex implements Index {
     private final AtomicLong freePosition = new AtomicLong(DATA_ROOT_NODE_START_POSITION);
 
     private final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
-
 
     /**
      * Length of index key

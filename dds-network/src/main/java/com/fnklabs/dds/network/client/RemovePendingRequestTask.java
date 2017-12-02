@@ -1,5 +1,6 @@
-package com.fnklabs.dds.network;
+package com.fnklabs.dds.network.client;
 
+import com.fnklabs.dds.network.ResponseFuture;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 

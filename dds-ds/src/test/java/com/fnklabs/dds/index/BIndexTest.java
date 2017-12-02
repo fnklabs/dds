@@ -1,5 +1,7 @@
 package com.fnklabs.dds.storage;
 
+import com.fnklabs.dds.index.BIndex;
+import com.fnklabs.dds.index.IndexExists;
 import org.junit.*;
 
 import java.io.File;
