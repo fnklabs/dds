@@ -2,6 +2,7 @@ package com.fnklabs.dds.network.client;
 
 import com.fnklabs.concurrent.Executors;
 import com.fnklabs.dds.network.*;
+import com.fnklabs.dds.network.pool.NetworkExecutor;
 import com.fnklabs.metrics.MetricsFactory;
 import com.fnklabs.metrics.Timer;
 import com.google.common.net.HostAndPort;
@@ -11,12 +12,20 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.SocketChannel;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+
+import static com.fnklabs.dds.network.NetworkConnector.closeChannel;
+import static com.fnklabs.dds.network.NetworkConnector.readFromChannel;
+import static com.fnklabs.dds.network.NetworkConnector.write;
 
 @Slf4j
 public class NetworkClient implements Closeable {
@@ -25,30 +34,57 @@ public class NetworkClient implements Closeable {
      * Is client running
      */
     private final AtomicBoolean isRunning = new AtomicBoolean(true);
-    /**
-     * Client connector instance
-     */
-    private final NetworkClientConnector connector;
 
-    private final ExecutorService executorService = Executors.fixedPoolExecutor(4, "network.client.worker");
+
+    private final ExecutorService executorService;
     private final ScheduledExecutorService scheduler = Executors.scheduler(1, "network.client.wd");
+    private final HostAndPort remoteAddress;
+    /**
+     * New (not process) messages from server for processing
+     */
+    private final Queue<ReplyMessage> messageQueue;
+    private final ByteBuffer messageBuffer = ByteBuffer.allocate(ApiVersion.CURRENT.MAX_MESSAGE_SIZE);
     /**
      * Response futures map
      */
     private Map<Long, ResponseFuture> responseFutures = new ConcurrentHashMap<>();
+    /**
+     * Client channel
+     */
+    private SocketChannel channel;
 
-    NetworkClient(HostAndPort remoteAddress, Consumer<ReplyMessage> unboundedMessageConsumer) throws IOException {
-        Queue<ReplyMessage> messageQueue = new ArrayBlockingQueue<>(500);
+    NetworkClient(HostAndPort remoteAddress, int workers, Consumer<ReplyMessage> unboundedMessageConsumer) throws IOException {
+        this.remoteAddress = remoteAddress;
 
-        connector = new NetworkClientConnector(
-                remoteAddress,
-                messageQueue,
-                Executors.fixedPoolExecutor(1, "network.client.io")
-        );
+        messageQueue = new ArrayBlockingQueue<>(500);
 
 
-        executorService.submit(new NetworkClientWorker(messageQueue, unboundedMessageConsumer, responseFutures, isRunning, executorService));
+//        connector = new NetworkClientConnector(
+//                remoteAddress,
+//                messageQueue,
+//                Executors.fixedPoolExecutor(1, "network.client.io")
+//        );
+
+        executorService = Executors.fixedPoolExecutor(workers, "network.client.worker");
+
+        executorService.submit(new NetworkClientWorker(messageQueue, unboundedMessageConsumer, responseFutures, isRunning));
         scheduler.scheduleWithFixedDelay(new RemovePendingRequestTask(responseFutures, isRunning), 0, 100, TimeUnit.MILLISECONDS);
+    }
+
+    public void join(NetworkExecutor executor) throws IOException {
+        log.warn("Building client: {}", remoteAddress);
+
+        channel = SocketChannel.open();
+        channel.setOption(StandardSocketOptions.TCP_NODELAY, true);
+        channel.configureBlocking(false);
+
+        channel.connect(new InetSocketAddress(remoteAddress.getHost(), remoteAddress.getPort()));
+
+        while (!channel.finishConnect()) {
+            // await connect
+        }
+
+        executor.registerOpRead(channel, this::processSelectorEvents);
     }
 
     /**
@@ -84,20 +120,73 @@ public class NetworkClient implements Closeable {
         });
         responseFutures.put(message.getId(), responseFuture);
 
-        connector.send(buffer);
+        write(channel, buffer);
 
         return responseFuture;
     }
 
     @Override
-    public void close() {
-        connector.close();
-
+    public void close() throws IOException {
         isRunning.set(false);
+
+        channel.close();
 
 
         executorService.shutdown();
         scheduler.shutdown();
+
+        try {
+            executorService.awaitTermination(60, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            log.warn("can't close client", e);
+        }
+        try {
+            scheduler.awaitTermination(60, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            log.warn("can't close client", e);
+        }
+    }
+
+    /**
+     * Process selector for retrieving messages from server
+     */
+    private void processSelectorEvents(SelectionKey key) {
+
+        SocketChannel clientSocketChannel = (SocketChannel) key.channel();
+
+        if (!key.isReadable()) {
+            return;
+        }
+
+        try {
+            readFromChannel(clientSocketChannel, messageBuffer);
+
+            messageBuffer.flip();
+
+            readMessagesFromBuffer(messageBuffer, messageQueue::add);
+
+            messageBuffer.compact();
+        } catch (ChannelClosedException e) {
+            closeChannel(key, clientSocketChannel);
+        }
+
+
+    }
+
+    private void readMessagesFromBuffer(ByteBuffer messageBuffer, Consumer<ReplyMessage> newMessageHandler) {
+        while (messageBuffer.remaining() >= Message.HEADER_SIZE) { // read all from buffer
+            try (Timer timer = MetricsFactory.getMetrics().getTimer("network.client.connector.buffer.write")) {
+                ReplyMessage message = new ReplyMessage();
+                message.write(messageBuffer);
+
+                newMessageHandler.accept(message);
+
+                log.debug("Buffer: {}", messageBuffer);
+
+            } catch (Exception e) {
+                log.warn("can't write message from buffer", e);
+            }
+        }
     }
 
 

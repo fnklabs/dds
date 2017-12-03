@@ -20,7 +20,7 @@ import java.util.function.Consumer;
 
 
 @Slf4j
-public class NioServerExecutor implements ServerExecutor {
+public class NioExecutor implements NetworkExecutor {
 
     private final ExecutorService opAcceptExecutor;
     private final ExecutorService opReadExecutor;
@@ -37,10 +37,10 @@ public class NioServerExecutor implements ServerExecutor {
     private final Map<Channel, Consumer<SelectionKey>> opReadConsumers = new ConcurrentHashMap<>();
     private final Map<Channel, Consumer<SelectionKey>> opWriteConsumers = new ConcurrentHashMap<>();
 
-    private NioServerExecutor(ExecutorService opAcceptExecutor,
-                              ExecutorService opReadExecutor,
-                              ExecutorService opWriteExecutor,
-                              int closeTimeout) throws IOException {
+    private NioExecutor(ExecutorService opAcceptExecutor,
+                        ExecutorService opReadExecutor,
+                        ExecutorService opWriteExecutor,
+                        int closeTimeout) throws IOException {
         this.opAcceptExecutor = opAcceptExecutor;
         this.opReadExecutor = opReadExecutor;
         this.opWriteExecutor = opWriteExecutor;
@@ -76,13 +76,13 @@ public class NioServerExecutor implements ServerExecutor {
             });
 
 
-//            opWriteExecutor.submit(() -> {
-//                while (isRunning.get()) {
-//                    processKeys(opWriteSelector, key -> {
-//                        opWriteConsumers.get(key.channel()).accept(key);
-//                    });
-//                }
-//            });
+            opWriteExecutor.submit(() -> {
+                while (isRunning.get()) {
+                    processKeys(opWriteSelector, key -> {
+                        opWriteConsumers.get(key.channel()).accept(key);
+                    });
+                }
+            });
         }
     }
 
@@ -91,34 +91,29 @@ public class NioServerExecutor implements ServerExecutor {
         isRunning.compareAndSet(true, false);
 
         try {
-            close();
+            opAcceptExecutor.shutdown();
+            opReadExecutor.shutdown();
+            opWriteExecutor.shutdown();
+
+            try {
+                opAcceptExecutor.awaitTermination(closeTimeout, TimeUnit.MILLISECONDS);
+            } catch (InterruptedException e) {
+                throw new IOException(e);
+            }
+
+            try {
+                opReadExecutor.awaitTermination(closeTimeout, TimeUnit.MILLISECONDS);
+            } catch (InterruptedException e) {
+                throw new IOException(e);
+            }
+
+            try {
+                opWriteExecutor.awaitTermination(closeTimeout, TimeUnit.MILLISECONDS);
+            } catch (InterruptedException e) {
+                throw new IOException(e);
+            }
         } catch (IOException e) {
             throw new RuntimeException(e); // todo add normal exception
-        }
-    }
-
-    @Override
-    public void close() throws IOException {
-        opAcceptExecutor.shutdown();
-        opReadExecutor.shutdown();
-        opWriteExecutor.shutdown();
-
-        try {
-            opAcceptExecutor.awaitTermination(closeTimeout, TimeUnit.MILLISECONDS);
-        } catch (InterruptedException e) {
-            throw new IOException(e);
-        }
-
-        try {
-            opReadExecutor.awaitTermination(closeTimeout, TimeUnit.MILLISECONDS);
-        } catch (InterruptedException e) {
-            throw new IOException(e);
-        }
-
-        try {
-            opWriteExecutor.awaitTermination(closeTimeout, TimeUnit.MILLISECONDS);
-        } catch (InterruptedException e) {
-            throw new IOException(e);
         }
     }
 
@@ -183,8 +178,8 @@ public class NioServerExecutor implements ServerExecutor {
         private int opWriteExecutor = 1;
         private int closeTimeout = 60_000; // 60 sec
 
-        public ServerExecutor build() throws IOException {
-            return new NioServerExecutor(
+        public NetworkExecutor build() throws IOException {
+            return new NioExecutor(
                     Executors.fixedPoolExecutor(opAcceptExecutor, "dds.nio.accept"),
                     Executors.fixedPoolExecutor(opReadExecutor, "dds.nio.read"),
                     Executors.fixedPoolExecutor(opWriteExecutor, "dds.nio.write"),

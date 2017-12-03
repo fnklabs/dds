@@ -23,7 +23,7 @@ public class NetworkClientFactory {
      */
     public NetworkClient build(HostAndPort remoteAddress, Consumer<ReplyMessage> messageConsumer) throws ClientException {
         try {
-            return new NetworkClient(remoteAddress, messageConsumer);
+            return new NetworkClient(remoteAddress, 1, messageConsumer);
         } catch (IOException e) {
             log.warn("Can't build client connector", e);
         }

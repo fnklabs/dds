@@ -26,8 +26,6 @@ class NetworkClientWorker implements Runnable {
 
     private final AtomicBoolean isRunning;
 
-    private final ExecutorService executorService;
-
     @Override
     public void run() {
         while (isRunning.get()) {
@@ -36,7 +34,7 @@ class NetworkClientWorker implements Runnable {
             if (message != null) {
                 log.debug("Received new message: {}", message);
 
-                executorService.submit(() -> onNewMessage(message));
+                onNewMessage(message);
             }
         }
     }

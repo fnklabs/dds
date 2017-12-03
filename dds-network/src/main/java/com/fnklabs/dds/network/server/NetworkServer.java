@@ -2,8 +2,7 @@ package com.fnklabs.dds.network.server;
 
 import com.fnklabs.concurrent.Executors;
 import com.fnklabs.dds.network.*;
-import com.fnklabs.dds.network.pool.NioServerExecutor;
-import com.fnklabs.dds.network.pool.ServerExecutor;
+import com.fnklabs.dds.network.pool.NetworkExecutor;
 import com.fnklabs.metrics.MetricsFactory;
 import com.fnklabs.metrics.Timer;
 import com.google.common.net.HostAndPort;
@@ -41,7 +40,6 @@ public class NetworkServer implements Closeable {
      */
     private final ThreadPoolExecutor workerPoolExecutor;
     private final HostAndPort listenAddress;
-    private final ServerExecutor executor;
     private final Map<Long, SocketChannel> sessions = new ConcurrentHashMap<>();
     /**
      * Client incoming message buffer
@@ -56,10 +54,7 @@ public class NetworkServer implements Closeable {
      *
      * @param incomeMessageHandler New message handler
      */
-    NetworkServer(HostAndPort listenAddress, int workers, IncomeMessageHandler incomeMessageHandler) throws IOException {
-
-        executor = NioServerExecutor.builder().build();
-
+    NetworkServer(HostAndPort listenAddress, int workers, IncomeMessageHandler incomeMessageHandler) {
         this.listenAddress = listenAddress;
 
         incomeMessageQueue = new ArrayBlockingQueue<>(10_000);
@@ -69,7 +64,7 @@ public class NetworkServer implements Closeable {
         workerPoolExecutor.submit(new NetworkServerWorker(incomeMessageQueue, isRunning, incomeMessageHandler, this::onNewReply));
     }
 
-    public void run() throws IOException {
+    public void join(NetworkExecutor executor) throws IOException {
         serverSocketChannel = ServerSocketChannel.open();
         serverSocketChannel.socket().bind(new InetSocketAddress(listenAddress.getHost(), listenAddress.getPort()));
         serverSocketChannel.configureBlocking(false);
@@ -79,7 +74,7 @@ public class NetworkServer implements Closeable {
                 try {
                     SocketChannel accept = serverSocketChannel.accept();
 
-                    onNewConnectionEvent(accept);
+                    onNewConnectionEvent(executor, accept);
                 } catch (IOException e) {
                     LOGGER.warn("can't accept key {}", key);
                 }
@@ -87,15 +82,12 @@ public class NetworkServer implements Closeable {
         });
 
         selectionKey.attach(-1); // stub for server
-
-        executor.run();
     }
 
     @Override
     public void close() throws IOException {
         isRunning.set(false);
 
-        executor.shutdown();
         workerPoolExecutor.shutdown();
 
         serverSocketChannel.close();
@@ -108,7 +100,7 @@ public class NetworkServer implements Closeable {
      *
      * @throws IOException
      */
-    private void onNewConnectionEvent(SocketChannel clientChannel) throws IOException {
+    private void onNewConnectionEvent(NetworkExecutor executor, SocketChannel clientChannel) throws IOException {
         long sessionId = getNextSessionId();
 
         sessions.put(sessionId, clientChannel);

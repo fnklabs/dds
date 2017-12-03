@@ -4,6 +4,8 @@ import com.fnklabs.dds.network.ReplyMessage;
 import com.fnklabs.dds.network.ResponseFuture;
 import com.fnklabs.dds.network.client.NetworkClient;
 import com.fnklabs.dds.network.client.NetworkClientFactory;
+import com.fnklabs.dds.network.pool.NetworkExecutor;
+import com.fnklabs.dds.network.pool.NioExecutor;
 import com.fnklabs.metrics.MetricsFactory;
 import com.fnklabs.metrics.Timer;
 import com.google.common.net.HostAndPort;
@@ -21,14 +23,24 @@ import java.util.stream.IntStream;
 public class NetworkServerTest {
     private NetworkServer networkServer;
 
+    private NetworkExecutor serverExecutor;
+
+    private NetworkExecutor clientExecutor;
+
     private NetworkClientFactory networkClientFactory;
 
     private HostAndPort hostAndPort = HostAndPort.fromParts("127.0.0.1", 10_000);
 
     @Before
     public void setUp() throws Exception {
+        serverExecutor = NioExecutor.builder().build();
+        serverExecutor.run();
+
+        clientExecutor = NioExecutor.builder().build();
+        clientExecutor.run();
+
         networkServer = new NetworkServer(hostAndPort, 4, new TestIncomeMessageHandler());
-        networkServer.run();
+        networkServer.join(serverExecutor);
 
         networkClientFactory = new NetworkClientFactory();
     }
@@ -36,12 +48,15 @@ public class NetworkServerTest {
     @After
     public void tearDown() throws Exception {
         networkServer.close();
+        serverExecutor.shutdown();
+
         MetricsFactory.getMetrics().report();
     }
 
     @Test
     public void sync() throws Exception {
         NetworkClient client = networkClientFactory.build(hostAndPort, message -> log.debug("New message from server: {}", message));
+        client.join(clientExecutor);
 
         ByteBuffer dataBuffer = ByteBuffer.allocate(Integer.BYTES);
 
@@ -73,6 +88,7 @@ public class NetworkServerTest {
     @Test
     public void async() throws Exception {
         NetworkClient client = networkClientFactory.build(hostAndPort, message -> log.debug("New message from server: {}", message));
+        client.join(clientExecutor);
 
         IntStream range = IntStream.range(0, 100_000);
 
