@@ -1,6 +1,5 @@
 package com.fnklabs.dds.network.server;
 
-import com.fnklabs.dds.network.server.NetworkServerWorker;
 import com.google.common.util.concurrent.ListenableFuture;
 
 import java.nio.ByteBuffer;

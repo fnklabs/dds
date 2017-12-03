@@ -5,11 +5,11 @@ import java.nio.ByteBuffer;
 /**
  * Base message structure
  * <pre>
- *     | ID   | API_VERSION | SIZE    | DATA           |
- *     |------|-------------|---------|----------------|
- *     | Long | Integer     | Integer |  byte[]        |
- *     |------|-------------|---------|----------------|
- *     | 0-7  | 8-11        | 12 - 15 | 16 - 16 + SIZE |
+ *     | ID   | Reply ID | API_VERSION | SIZE    | DATA           |
+ *     |------|----------|-------------|---------|----------------|
+ *     | Long |  Long    | Integer     | Integer |  byte[]        |
+ *     |------|----------|-------------|---------|----------------|
+ *     | 0-7  | 8-15     | 16 - 19     | 20 - 23 |  23 + SIZE     |
  * </pre>
  */
 public interface Message {
@@ -21,6 +21,13 @@ public interface Message {
      * @return Message id
      */
     long getId();
+
+    /**
+     * Get id for reply message
+     *
+     * @return id for reply message or 0 if is not reply
+     */
+    long getReplyId();
 
     /**
      * Api version

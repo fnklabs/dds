@@ -6,17 +6,19 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * Base message structure
  * <pre>
- *     | ID   | API_VERSION | SIZE    | DATA           |
- *     |------|-------------|---------|----------------|
- *     | Long | Integer     | Integer |  byte[]        |
- *     |------|-------------|---------|----------------|
- *     | 0-7  | 8-11        | 12 - 15 | 16 - 16 + SIZE |
+ *     | ID   | Reply ID | API_VERSION | SIZE    | DATA           |
+ *     |------|----------|-------------|---------|----------------|
+ *     | Long |  Long    | Integer     | Integer |  byte[]        |
+ *     |------|----------|-------------|---------|----------------|
+ *     | 0-7  | 8-15     | 16 - 19     | 20 - 23 |  23 + SIZE     |
  * </pre>
  */
 public class RequestMessage implements Message {
     public static final AtomicLong ID = new AtomicLong();
 
     private long id;
+
+    private long replyId;
 
     private ApiVersion apiVersion;
 
@@ -40,6 +42,7 @@ public class RequestMessage implements Message {
 
     public RequestMessage(long id, ApiVersion apiVersion, byte[] data) {
         this.id = id;
+        this.replyId = 0;
         this.apiVersion = apiVersion;
         this.data = data;
         this.dataSize = data != null ? data.length : 0;
@@ -59,6 +62,11 @@ public class RequestMessage implements Message {
     }
 
     @Override
+    public long getReplyId() {
+        return replyId;
+    }
+
+    @Override
     public ApiVersion getVersion() {
         return apiVersion;
     }
@@ -70,7 +78,11 @@ public class RequestMessage implements Message {
 
     @Override
     public int getSize() {
-        return Long.BYTES + Integer.BYTES + Integer.BYTES + getDataSize();
+        return Long.BYTES  // id
+                + Long.BYTES // reply id
+                + Integer.BYTES // version
+                + Integer.BYTES // size
+                + getDataSize(); // data
     }
 
     @Override
@@ -81,6 +93,7 @@ public class RequestMessage implements Message {
     @Override
     public void read(ByteBuffer buffer) {
         buffer.putLong(id);
+        buffer.putLong(replyId);
         buffer.putInt(apiVersion.getVersion());
         buffer.putInt(dataSize);
         buffer.put(data);
@@ -89,6 +102,7 @@ public class RequestMessage implements Message {
     @Override
     public void write(ByteBuffer buffer) {
         id = buffer.getLong();
+        replyId = buffer.getLong();
         apiVersion = ApiVersion.valueOf(buffer.getInt());
         dataSize = buffer.getInt();
         data = new byte[dataSize];

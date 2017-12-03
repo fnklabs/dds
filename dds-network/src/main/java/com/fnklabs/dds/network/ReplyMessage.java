@@ -6,11 +6,11 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * Response structure
  * <pre>
- *     | ID   | API_VERSION | Data SIZE | Reply ID | Status Code |  DATA     |
- *     |------|-------------|-----------|----------|-------------|-----------|
- *     | Long | Integer     | Integer   | Long     | int         |  byte[]   |
- *     |------|-------------|-----------|----------|-------------|-----------|
- *     | 0-7  | 8-11        | 12 - 15   | 16 - 23  | 24-27       | 28 + SIZE |
+ *     | ID   | Reply ID | API_VERSION | Data SIZE | Status Code |Extra DATA |
+ *     |------|----------|-------------|-----------|-------------|-----------|
+ *     | Long |  Long    | Integer     | Integer   | Integer     |  byte[]   |
+ *     |------|----------|-------------|-----------|-------------|-----------|
+ *     | 0-7  | 8-15     |  15-19      |  20-23    | 24-27       | 28 + SIZE |
  * </pre>
  */
 public class ReplyMessage implements Message {
@@ -39,7 +39,7 @@ public class ReplyMessage implements Message {
     public ReplyMessage() {
     }
 
-    public ReplyMessage(long id, ApiVersion apiVersion, long replyId, byte[] data) {
+    public ReplyMessage(long id, long replyId, ApiVersion apiVersion, byte[] data) {
         this.id = id;
         this.apiVersion = apiVersion;
         this.replyId = replyId;
@@ -48,7 +48,7 @@ public class ReplyMessage implements Message {
         this.size = data.length;
     }
 
-    public ReplyMessage(long id, ApiVersion apiVersion, long replyId, StatusCode statusCode, byte[] data) {
+    public ReplyMessage(long id, long replyId, ApiVersion apiVersion, StatusCode statusCode, byte[] data) {
         this.id = id;
         this.apiVersion = apiVersion;
         this.replyId = replyId;
@@ -74,7 +74,12 @@ public class ReplyMessage implements Message {
 
     @Override
     public int getSize() {
-        return Long.BYTES + Integer.BYTES + Integer.BYTES + Long.BYTES + Integer.BYTES + getDataSize();
+        return Long.BYTES // id
+                + Long.BYTES // reply id
+                + Integer.BYTES // version
+                + Integer.BYTES // size
+                + Integer.BYTES // status code
+                + getDataSize(); // data
     }
 
     @Override
@@ -85,9 +90,9 @@ public class ReplyMessage implements Message {
     @Override
     public void read(ByteBuffer buffer) {
         buffer.putLong(id);
+        buffer.putLong(replyId);
         buffer.putInt(apiVersion.getVersion());
         buffer.putInt(size);
-        buffer.putLong(replyId);
         buffer.putInt(statusCode.value());
         buffer.put(data);
     }
@@ -95,9 +100,9 @@ public class ReplyMessage implements Message {
     @Override
     public void write(ByteBuffer buffer) {
         id = buffer.getLong();
+        replyId = buffer.getLong();
         apiVersion = ApiVersion.valueOf(buffer.getInt());
         size = buffer.getInt();
-        replyId = buffer.getLong();
         statusCode = StatusCode.valueOf(buffer.getInt());
         data = new byte[size];
 

@@ -73,7 +73,7 @@ class NetworkServerWorker implements Runnable {
 
                 log.debug("Reply {} on {}", data, message);
 
-                ReplyMessage msg = new ReplyMessage(ReplyMessage.ID.incrementAndGet(), ApiVersion.CURRENT, message.getId(), data);
+                ReplyMessage msg = new ReplyMessage(ReplyMessage.ID.incrementAndGet(), message.getId(), ApiVersion.CURRENT, data);
 
                 timer.stop();
 
@@ -85,7 +85,7 @@ class NetworkServerWorker implements Runnable {
                 log.warn("Cant process message: {}", message, t);
                 timer.stop();
 
-                responseConsumer.accept(message.getSessionId(), new ReplyMessage(ReplyMessage.ID.incrementAndGet(), ApiVersion.CURRENT, message.getId(), StatusCode.OK, null));
+                responseConsumer.accept(message.getSessionId(), new ReplyMessage(ReplyMessage.ID.incrementAndGet(), message.getId(), ApiVersion.CURRENT, StatusCode.OK, null));
             }
         });
     }
