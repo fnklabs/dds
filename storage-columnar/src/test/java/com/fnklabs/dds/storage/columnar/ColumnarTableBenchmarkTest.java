@@ -5,6 +5,7 @@ import com.fnklabs.dds.storage.column.Column;
 import com.fnklabs.dds.storage.column.IntegerColumn;
 import com.fnklabs.dds.storage.column.LongColumn;
 import com.fnklabs.dds.storage.im.ImStorageFactory;
+import com.fnklabs.dds.storage.query.Condition;
 import org.openjdk.jmh.annotations.*;
 
 import java.nio.ByteBuffer;
@@ -13,7 +14,7 @@ import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-@Threads(value = 4)
+@Threads(value = 1)
 @Fork(value = 4, jvmArgs = {
         "-server",
         "-Xms512m",
@@ -43,6 +44,11 @@ public class ColumnarTableBenchmarkTest {
     @Benchmark
     public void read(ReadContext readContext) {
         readContext.table.read(readContext.next());
+    }
+
+    @Benchmark
+    public void query(QueryContext context) {
+        context.table.query("price", context.condition, new PriceTotal.SumPrice());
     }
 
     @State(Scope.Benchmark)
@@ -126,5 +132,47 @@ public class ColumnarTableBenchmarkTest {
         }
     }
 
+    @State(Scope.Benchmark)
+    public static class QueryContext {
+        ColumnarTable table;
+        Condition<Long> condition;
+
+        private LongColumn idColumn;
+        private LongColumn createdAtColumn;
+        private IntegerColumn priceColumn;
+
+        @Setup
+        public void setUp() {
+            idColumn = new LongColumn("id", (short) 0, true);
+            createdAtColumn = new LongColumn("created_at", (short) 1);
+            priceColumn = new IntegerColumn("price", (short) 2);
+
+            table = new ColumnarTable(
+                    "test",
+                    Arrays.asList(idColumn, createdAtColumn, priceColumn),
+                    4,
+                    256 * 1024 * 1024,
+                    new ImStorageFactory()
+            );
+
+            for (long i = 0; i < 100_000; i++) {
+                table.write(next(i));
+            }
+
+            condition = new Condition<>((t) -> t.equals(1L));
+        }
+
+        private Record next(long i) {
+            long id = i % 100;
+
+            return new Record(
+                    new HashMap<Column, Object>() {{
+                        put(idColumn, id);
+                        put(createdAtColumn, 1L);
+                        put(priceColumn, 1);
+                    }}
+            );
+        }
+    }
 
 }

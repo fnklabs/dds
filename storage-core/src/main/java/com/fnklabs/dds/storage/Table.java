@@ -1,6 +1,7 @@
 package com.fnklabs.dds.storage;
 
 import com.fnklabs.dds.storage.column.Column;
+import com.fnklabs.dds.storage.query.Condition;
 
 import java.util.List;
 import java.util.Set;
@@ -22,8 +23,6 @@ public interface Table<C extends Chunk> {
      */
     Set<C> chunks();
 
-    <R> R map(Task<C, R> task);
-
     /**
      * Write data into table
      *
@@ -41,4 +40,6 @@ public interface Table<C extends Chunk> {
      * @return data or null is not present
      */
     Record read(byte[] key);
+
+    <T, R> R query(String column, Condition condition, Reducer<T, R> reducer);
 }

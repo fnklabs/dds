@@ -1,5 +1,9 @@
 package com.fnklabs.dds.storage;
 
+import com.fnklabs.dds.storage.query.Condition;
+
+import java.util.Collection;
+
 public interface Chunk {
     /**
      * Table name
@@ -39,4 +43,6 @@ public interface Chunk {
      *  @param key chunk position
      * */
     Record read(byte[] key);
+
+    <T> Collection<T> query(String column, Condition condition);
 }

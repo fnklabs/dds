@@ -5,6 +5,7 @@ import com.fnklabs.dds.storage.column.Column;
 import com.fnklabs.dds.storage.column.IntegerColumn;
 import com.fnklabs.dds.storage.column.LongColumn;
 import com.fnklabs.dds.storage.im.ImStorageFactory;
+import com.fnklabs.dds.storage.query.Condition;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -109,5 +110,27 @@ public class ColumnarTableTest {
         Assert.assertEquals(Long.valueOf(2L), record.<Long>get(idColumn));
         Assert.assertEquals(Long.valueOf(5L), record.get(createdAtColumn));
         Assert.assertEquals(Integer.valueOf(6), record.get(priceColumn));
+    }
+
+    @Test
+    public void query() {
+        for (long i = 0; i < 100; i++) {
+            long value = i % 10;
+            Record record = new Record(new HashMap<Column, Object>() {{
+                put(idColumn, value);
+                put(createdAtColumn, 1L);
+                put(priceColumn, 1);
+            }});
+
+            columnarTable.write(record);
+        }
+
+        Integer result = columnarTable.query(
+                priceColumn.name(),
+                new Condition<Long>(o -> o.equals(3L)),
+                new PriceTotal.SumPrice()
+        );
+
+        Assert.assertEquals(10, result.intValue());
     }
 }

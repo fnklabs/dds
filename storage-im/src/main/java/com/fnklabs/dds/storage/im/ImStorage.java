@@ -1,6 +1,8 @@
 package com.fnklabs.dds.storage.im;
 
 import com.fnklabs.dds.storage.Storage;
+import com.fnklabs.metrics.MetricsFactory;
+import com.fnklabs.metrics.Timer;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
@@ -34,15 +36,16 @@ public class ImStorage implements Storage {
 
     @Override
     public void read(int position, int length, ByteBuffer data) {
-        reentrantLock.lock();
+        Timer timer = MetricsFactory.getMetrics().getTimer("storage.im.read");
 
-        buffer.position(position);
-
-        for (int i = 0; i < length; i++) {
-            byte b = buffer.get();
-            data.put(b);
+        try {
+            for (int i = 0; i < length; i++) {
+                byte b = buffer.get(position + i);
+                data.put(b);
+            }
+        } finally {
+            timer.stop();
         }
 
-        reentrantLock.unlock();
     }
 }

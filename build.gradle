@@ -42,12 +42,13 @@ subprojects {
 
     ext {
         vers = [
-                "jmh"        : "1.17.5",
+                "jmh"   : "1.17.5",
                 junit   : '4.12',
                 mockito : '2.2.9',
                 jodatime: '2.9.2',
                 guava   : '20.0',
                 intellij: '12.0',
+                lang3   : '3.3.2',
                 logback : '1.2.3',
 
                 metrics : '0.1.14',

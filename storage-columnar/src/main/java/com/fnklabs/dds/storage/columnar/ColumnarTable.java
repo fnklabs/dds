@@ -1,21 +1,22 @@
 package com.fnklabs.dds.storage.columnar;
 
 import com.fnklabs.dds.storage.Record;
+import com.fnklabs.dds.storage.Reducer;
 import com.fnklabs.dds.storage.StorageFactory;
 import com.fnklabs.dds.storage.Table;
-import com.fnklabs.dds.storage.Task;
 import com.fnklabs.dds.storage.column.Column;
+import com.fnklabs.dds.storage.query.Condition;
+import com.fnklabs.metrics.MetricsFactory;
+import com.fnklabs.metrics.Timer;
 import com.google.common.collect.Range;
 import com.google.common.hash.HashFunction;
 import com.google.common.hash.Hashing;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 public class ColumnarTable implements Table<ColumnarChunk> {
     public static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(ColumnarTable.class);
@@ -25,7 +26,6 @@ public class ColumnarTable implements Table<ColumnarChunk> {
 
     private final HashFunction hashFunction = Hashing.murmur3_128();
 
-    private final int chunkSize;
     private final int vNodes;
 
     private final List<Column> columns;
@@ -33,7 +33,6 @@ public class ColumnarTable implements Table<ColumnarChunk> {
     public ColumnarTable(String tableName, List<Column> columns, int vNodes, int chunkSize, StorageFactory storageFactory) {
         this.tableName = tableName;
         this.columns = columns;
-        this.chunkSize = chunkSize;
         this.vNodes = vNodes;
 
 
@@ -51,7 +50,6 @@ public class ColumnarTable implements Table<ColumnarChunk> {
             } else {
                 to = from + step;
             }
-
 
             Range<Long> tokenRange = to == Long.MAX_VALUE ? Range.closed(from, to) : Range.closedOpen(from, to);
 
@@ -79,11 +77,6 @@ public class ColumnarTable implements Table<ColumnarChunk> {
     }
 
     @Override
-    public <R> R map(Task<ColumnarChunk, R> task) {
-        return task.map(new HashSet<>(chunks.values()));
-    }
-
-    @Override
     public void write(Record record) {
         Column primary = record.getPrimary();
 
@@ -105,6 +98,26 @@ public class ColumnarTable implements Table<ColumnarChunk> {
         LOGGER.debug("read `{}` from chunk {}", key, chunkForKey);
 
         return chunkForKey.read(key);
+    }
+
+    @Override
+    public <T, R> R query(String column, Condition condition, Reducer<T, R> reducer) {
+        Timer timer = MetricsFactory.getMetrics().getTimer("table.columnar.query");
+        Collection<T> collect = chunks().stream()
+                                        .parallel()
+                                        .flatMap(c -> {
+                                            Collection<T> row = c.query(column, condition);
+
+                                            return row.stream();
+                                        })
+                                        .collect(Collectors.toList());
+
+
+        R reduce = reducer.reduce(collect);
+
+        timer.stop();
+
+        return reduce;
     }
 
     private ColumnarChunk getChunkForKey(byte[] key) {
