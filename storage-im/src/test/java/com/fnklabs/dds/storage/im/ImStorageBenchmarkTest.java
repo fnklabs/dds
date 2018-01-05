@@ -1,12 +1,20 @@
 package com.fnklabs.dds.storage.im;
 
 import org.openjdk.jmh.annotations.*;
+import org.openjdk.jmh.profile.*;
+import org.openjdk.jmh.results.RunResult;
+import org.openjdk.jmh.runner.Runner;
+import org.openjdk.jmh.runner.RunnerException;
+import org.openjdk.jmh.runner.options.Options;
+import org.openjdk.jmh.runner.options.OptionsBuilder;
+import org.openjdk.jmh.runner.options.VerboseMode;
 
 import java.nio.ByteBuffer;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
-@Threads(value = 1)
+
+@Threads(value = 4)
 @Fork(value = 1, jvmArgs = {
         "-server",
         "-Xms512m",
@@ -24,13 +32,15 @@ import java.util.concurrent.TimeUnit;
         "-XX:+UseTLAB",
         "-XX:+ScavengeBeforeFullGC",
         "-XX:+DisableExplicitGC",
+        "-XX:MaxDirectMemorySize=1G"
 })
 @Warmup(iterations = 5, timeUnit = TimeUnit.MILLISECONDS)
+@Measurement(iterations = 10, timeUnit = TimeUnit.MICROSECONDS)
 public class ImStorageBenchmarkTest {
 
     @Benchmark
     public void read(Context context, ReadParameters parameters) {
-        context.imStorage.read(parameters.position, Integer.BYTES, parameters.buffer);
+        context.imStorage.read(parameters.position, parameters.buffer);
         parameters.buffer.rewind();
     }
 
@@ -41,14 +51,74 @@ public class ImStorageBenchmarkTest {
         parameters.buffer.rewind();
     }
 
+    @Benchmark
+    public void scanBuffer(ScanContext context, ScanParameters scanParameters) {
+        for (int i = 0; i < ScanContext.ALLOCATED_SIZE; i += Integer.BYTES) {
+            context.imStorage.read(i, scanParameters.byteBuffer);
+            scanParameters.byteBuffer.clear();
+        }
+    }
+
+    @Benchmark
+    public void scanByte(ScanContext context, ScanParameters scanParameters) {
+        for (int i = 0; i < ScanContext.ALLOCATED_SIZE; i += Integer.BYTES) {
+            context.imStorage.read(i, scanParameters.buffer);
+        }
+    }
+
+    @Benchmark
+    public void scanBigBuffer(ScanContext context, ScanParameters scanParameters) {
+        for (int i = 0; i < ScanContext.ALLOCATED_SIZE; i += scanParameters.bigBuffer.length) {
+            context.imStorage.read(i, scanParameters.bigBuffer);
+        }
+    }
+
+    @Benchmark
+    public void scan(ScanContext context, ScanParameters scanParameters) {
+        context.imStorage.scan(
+                0,
+                (position, data) -> true,
+                () -> scanParameters.byteBuffer
+        );
+    }
+
 
     @State(Scope.Benchmark)
     public static class Context {
+        public static final int ALLOCATED_SIZE = 64 * 1024 * 1024;
         ImStorage imStorage;
 
         @Setup
         public void setUp() {
-            imStorage = new ImStorage(64 * 1024 * 1024);
+            imStorage = new ImStorage(ALLOCATED_SIZE);
+        }
+    }
+
+    @State(Scope.Benchmark)
+    public static class ScanContext {
+        public static final int ALLOCATED_SIZE = 32 * 1024 * 1024;
+        public static final int OPERATIONS = ALLOCATED_SIZE / Integer.BYTES;
+        ImStorage imStorage;
+
+        private ByteBuffer byteBuffer = ByteBuffer.allocate(Integer.BYTES);
+
+        @Setup
+        public void setUp() {
+            imStorage = new ImStorage(ALLOCATED_SIZE);
+
+            for (int i = 0; i < ALLOCATED_SIZE; i += Integer.BYTES) {
+                byteBuffer.putInt(i);
+                byteBuffer.rewind();
+                imStorage.write(i, byteBuffer);
+                byteBuffer.clear();
+            }
+
+            System.err.println(String.format("Items: %d size: %d/%d", imStorage.items(), imStorage.actualSize(), imStorage.allocatedSize()));
+        }
+
+        @TearDown
+        public void tearDown() {
+            System.err.println(String.format("Items: %d size: %d/%d", imStorage.items(), imStorage.actualSize(), imStorage.allocatedSize()));
         }
     }
 
@@ -83,4 +153,35 @@ public class ImStorageBenchmarkTest {
         }
     }
 
+    @State(Scope.Thread)
+    public static class ScanParameters {
+
+        byte[] buffer;
+        byte[] bigBuffer;
+        ByteBuffer byteBuffer;
+
+        @Setup
+        public void setUp() {
+            buffer = new byte[Integer.BYTES];
+            bigBuffer = new byte[4 * 1024];
+            byteBuffer = ByteBuffer.allocate(Integer.BYTES);
+        }
+    }
+
+    public static void main(String[] args) throws RunnerException {
+        Options opt = new OptionsBuilder()
+                .include(ImStorageBenchmarkTest.class.getName())
+                .addProfiler(GCProfiler.class)
+                .addProfiler(HotspotMemoryProfiler.class)
+                .addProfiler(HotspotRuntimeProfiler.class)
+                .addProfiler(HotspotThreadProfiler.class)
+                .addProfiler(PausesProfiler.class)
+                .addProfiler(StackProfiler.class)
+                .verbosity(VerboseMode.EXTRA)
+                .build();
+
+        for (RunResult runResult : new Runner(opt).run()) {
+
+        }
+    }
 }

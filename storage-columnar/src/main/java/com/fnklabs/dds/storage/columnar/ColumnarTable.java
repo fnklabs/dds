@@ -104,7 +104,6 @@ public class ColumnarTable implements Table<ColumnarChunk> {
     public <T, R> R query(String column, Condition condition, Reducer<T, R> reducer) {
         Timer timer = MetricsFactory.getMetrics().getTimer("table.columnar.query");
         Collection<T> collect = chunks().stream()
-                                        .parallel()
                                         .flatMap(c -> {
                                             Collection<T> row = c.query(column, condition);
 

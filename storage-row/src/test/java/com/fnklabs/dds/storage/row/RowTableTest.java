@@ -1,4 +1,4 @@
-package com.fnklabs.dds.storage.columnar;
+package com.fnklabs.dds.storage.row;
 
 import com.fnklabs.dds.storage.Record;
 import com.fnklabs.dds.storage.column.Column;
@@ -14,8 +14,8 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
 
-public class ColumnarTableTest {
-    private ColumnarTable columnarTable;
+public class RowTableTest {
+    private RowTable rowTable;
 
     private LongColumn idColumn;
     private LongColumn createdAtColumn;
@@ -27,22 +27,21 @@ public class ColumnarTableTest {
         createdAtColumn = new LongColumn("created_at", (short) 1);
         priceColumn = new IntegerColumn("price", (short) 2);
 
-        columnarTable = new ColumnarTable(
+        rowTable = new RowTable(
                 "test",
                 Arrays.asList(
                         idColumn,
                         createdAtColumn,
                         priceColumn
                 ),
-                4,
-                32 * 1024 * 1024,
+                64 * 1024 * 1024,
                 new ImStorageFactory()
         );
     }
 
     @Test
     public void name() {
-        Assert.assertEquals("test", columnarTable.name());
+        Assert.assertEquals("test", rowTable.name());
     }
 
     @Test
@@ -61,12 +60,12 @@ public class ColumnarTableTest {
             put(priceColumn, 3);
         }});
 
-        columnarTable.write(record);
+        rowTable.write(record);
     }
 
     @Test
     public void readNull() {
-        Record record = columnarTable.read(new byte[]{1});
+        Record record = rowTable.read(new byte[]{1});
 
         Assert.assertNull(record);
     }
@@ -85,14 +84,14 @@ public class ColumnarTableTest {
             put(priceColumn, 6);
         }});
 
-        columnarTable.write(record1);
-        columnarTable.write(record2);
+        rowTable.write(record1);
+        rowTable.write(record2);
 
         ByteBuffer keyBuffer = ByteBuffer.allocate(Long.BYTES);
         keyBuffer.putLong(1L);
         keyBuffer.rewind();
 
-        Record record = columnarTable.read(keyBuffer.array());
+        Record record = rowTable.read(keyBuffer.array());
 
         Assert.assertNotNull(record);
         Assert.assertEquals(Long.valueOf(1L), record.<Long>get(idColumn));
@@ -104,7 +103,7 @@ public class ColumnarTableTest {
         keyBuffer.putLong(2L);
         keyBuffer.rewind();
 
-        record = columnarTable.read(keyBuffer.array());
+        record = rowTable.read(keyBuffer.array());
 
         Assert.assertNotNull(record);
         Assert.assertEquals(Long.valueOf(2L), record.<Long>get(idColumn));
@@ -122,12 +121,11 @@ public class ColumnarTableTest {
                 put(priceColumn, 1);
             }});
 
-            columnarTable.write(record);
+            rowTable.write(record);
         }
 
-        for (;;) {
-//        for (int i = 0; i < 4; i++) {
-            Integer result = columnarTable.query(
+        for (int i = 0; i < 4; i++) {
+            Integer result = rowTable.query(
                     priceColumn.name(),
                     new Condition<Long>(o -> o.equals(3L)),
                     new PriceTotal.SumPrice()

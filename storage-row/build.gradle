@@ -1,0 +1,18 @@
+dependencies {
+
+    compile project(":dds-storage-core")
+    compile project(":dds-storage-im")
+
+
+    compile "com.google.guava:guava:$vers.guava"
+
+    compile "org.slf4j:slf4j-api:$vers.slf4j"
+
+    compile "org.apache.commons:commons-lang3:$vers.lang3"
+
+    testCompile "junit:junit:$vers.junit"
+    testCompile "org.mockito:mockito-core:$vers.mockito"
+    testCompile "org.openjdk.jmh:jmh-core:$vers.jmh"
+    testCompile "org.openjdk.jmh:jmh-generator-annprocess:$vers.jmh"
+    testCompile "ch.qos.logback:logback-classic:$vers.logback"
+}

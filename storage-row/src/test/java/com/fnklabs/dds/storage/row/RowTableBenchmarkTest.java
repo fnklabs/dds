@@ -1,4 +1,4 @@
-package com.fnklabs.dds.storage.columnar;
+package com.fnklabs.dds.storage.row;
 
 import com.fnklabs.dds.storage.Record;
 import com.fnklabs.dds.storage.column.Column;
@@ -34,7 +34,7 @@ import java.util.concurrent.atomic.AtomicLong;
         "-XX:+DisableExplicitGC",
 })
 @Warmup(iterations = 10, timeUnit = TimeUnit.MILLISECONDS)
-public class ColumnarTableBenchmarkTest {
+public class RowTableBenchmarkTest {
 
     @Benchmark
     public void write(WriteContext context) {
@@ -55,7 +55,7 @@ public class ColumnarTableBenchmarkTest {
     public static class ReadContext {
         private static final AtomicLong counter = new AtomicLong();
 
-        ColumnarTable table;
+        RowTable table;
         private LongColumn idColumn;
         private LongColumn createdAtColumn;
         private IntegerColumn priceColumn;
@@ -66,11 +66,10 @@ public class ColumnarTableBenchmarkTest {
             createdAtColumn = new LongColumn("created_at", (short) 1);
             priceColumn = new IntegerColumn("price", (short) 2);
 
-            table = new ColumnarTable(
+            table = new RowTable(
                     "test",
                     Arrays.asList(idColumn, createdAtColumn, priceColumn),
-                    8,
-                    64 * 1024 * 1024,
+                    256 * 1024 * 1024,
                     new ImStorageFactory()
             );
 
@@ -101,7 +100,7 @@ public class ColumnarTableBenchmarkTest {
     @State(Scope.Benchmark)
     public static class WriteContext {
         private static final AtomicLong counter = new AtomicLong();
-        ColumnarTable table;
+        RowTable table;
         private LongColumn idColumn;
         private LongColumn createdAtColumn;
         private IntegerColumn priceColumn;
@@ -112,10 +111,9 @@ public class ColumnarTableBenchmarkTest {
             createdAtColumn = new LongColumn("created_at", (short) 1);
             priceColumn = new IntegerColumn("price", (short) 2);
 
-            table = new ColumnarTable(
+            table = new RowTable(
                     "test",
                     Arrays.asList(idColumn, createdAtColumn, priceColumn),
-                    4,
                     256 * 1024 * 1024,
                     new ImStorageFactory()
             );
@@ -134,7 +132,7 @@ public class ColumnarTableBenchmarkTest {
 
     @State(Scope.Benchmark)
     public static class QueryContext {
-        ColumnarTable table;
+        RowTable table;
         Condition<Long> condition;
 
         private LongColumn idColumn;
@@ -147,10 +145,9 @@ public class ColumnarTableBenchmarkTest {
             createdAtColumn = new LongColumn("created_at", (short) 1);
             priceColumn = new IntegerColumn("price", (short) 2);
 
-            table = new ColumnarTable(
+            table = new RowTable(
                     "test",
                     Arrays.asList(idColumn, createdAtColumn, priceColumn),
-                    4,
                     256 * 1024 * 1024,
                     new ImStorageFactory()
             );

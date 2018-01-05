@@ -155,7 +155,7 @@ public class ColumnarChunk implements Chunk {
         int block = -1;
 
         for (int i = 0; i < currentPosition; i = i + primaryColumnSize) {
-            storage.read(i, primaryColumnSize, buffer);
+            storage.read(i, buffer);
 
             buffer.rewind();
 
@@ -206,32 +206,42 @@ public class ColumnarChunk implements Chunk {
         Column column = getColumn(columnName);
 
         Integer offset = columnOffset.get(column);
-        int currentSize = columnPositions.get(column).get();
+        int columnarBlockEndPosition = columnPositions.get(column).get();
 
         int columnBlockSize = column.size() + (column.isPrimary() ? 0 : primaryColumnSize);
 
-        ByteBuffer buffer = ByteBuffer.allocate(columnBlockSize);
+        ByteBuffer buffer = ByteBuffer.allocate(columnBlockSize * 1024);
 
         Collection<T> result = new ArrayList<>();
 
-        for (int position = offset; position < currentSize; position = position + columnBlockSize) {
-            storage.read(position, columnBlockSize, buffer);
+        int position = offset;
+
+        while (position < columnarBlockEndPosition) {
+
+            storage.read(position, buffer);
 
             buffer.rewind();
-            buffer.position(column.size());
 
-            Object primaryVal = primaryColumn.read(buffer);
-
-            if (condition.test(primaryVal)) {
-                buffer.rewind();
-
+            while (buffer.remaining() > 0) {
                 Object columnValue = column.read(buffer);
+                Object primaryVal = primaryColumn.read(buffer);
 
-                result.add((T) columnValue);
+                if (condition.test(primaryVal)) {
+                    result.add((T) columnValue);
+                }
             }
 
-            buffer.rewind();
+            buffer.clear();
+
+            int newPosition = position + columnBlockSize * 1024;
+
+            if (newPosition > columnarBlockEndPosition) {
+                newPosition = columnarBlockEndPosition;
+            }
+
+            position = newPosition;
         }
+
 
         timer.stop();
 
@@ -252,7 +262,7 @@ public class ColumnarChunk implements Chunk {
 
         int blockPosition = columnOffset.get(c) + index * blockSize;
 
-        storage.read(blockPosition, blockSize, buffer);
+        storage.read(blockPosition, buffer);
     }
 
     private Object readColumnValue(Column c, int index, ByteBuffer buffer) {
@@ -260,7 +270,7 @@ public class ColumnarChunk implements Chunk {
 
         int blockPosition = columnOffset.get(c) + index * blockSize;
 
-        storage.read(blockPosition, blockSize, buffer);
+        storage.read(blockPosition, buffer);
 
         buffer.flip();
 
