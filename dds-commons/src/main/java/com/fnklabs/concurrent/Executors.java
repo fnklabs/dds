@@ -16,7 +16,7 @@ public final class Executors {
         );
     }
 
-    public static ThreadPoolExecutor getThreadPoolExecutor(int poolSize, String name) {
+    public static ThreadPoolExecutor fixedPoolExecutor(int poolSize, String name) {
 
         return new ThreadPoolExecutor(
                 poolSize,

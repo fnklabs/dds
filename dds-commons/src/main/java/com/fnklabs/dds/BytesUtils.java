@@ -1,5 +1,7 @@
 package com.fnklabs.dds;
 
+import java.nio.ByteBuffer;
+
 public class BytesUtils {
     /**
      * Compare left and right bytes. length of left and right bytes array must be equals
@@ -26,4 +28,11 @@ public class BytesUtils {
         }
         return 0;
     }
+
+    public static void read(ByteBuffer src, ByteBuffer dst) {
+        while (dst.remaining() > 0 && src.remaining() > 0) {
+            dst.put(src.get());
+        }
+    }
+
 }
