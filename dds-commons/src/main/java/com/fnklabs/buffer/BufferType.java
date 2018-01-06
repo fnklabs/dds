@@ -4,7 +4,7 @@ import com.google.common.base.Verify;
 
 import java.util.function.Function;
 
-public enum Type {
+public enum BufferType {
     HEAP((size) -> {
         Verify.verify(size <= Integer.MAX_VALUE, "size can't be higher that %d bytes", Integer.MAX_VALUE);
 
@@ -17,7 +17,7 @@ public enum Type {
     }),;
     private final Function<Long, Buffer> bufferSupplier;
 
-    Type(Function<Long, Buffer> bufferSupplier) {this.bufferSupplier = bufferSupplier;}
+    BufferType(Function<Long, Buffer> bufferSupplier) {this.bufferSupplier = bufferSupplier;}
 
     public Buffer get(long size) {
         return bufferSupplier.apply(size);

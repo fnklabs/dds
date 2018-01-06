@@ -4,11 +4,11 @@ import java.nio.ByteBuffer;
 import java.util.function.Supplier;
 
 public interface Storage {
-    int allocatedSize();
+    long allocatedSize();
 
-    int actualSize();
+    long actualSize();
 
-    int items();
+    long items();
 
     /**
      * Put data
@@ -16,7 +16,7 @@ public interface Storage {
      * @param position position
      * @param data     buffer from which data will read and written
      */
-    void write(int position, ByteBuffer data);
+    void write(long position, ByteBuffer data);
 
     /**
      * Read data
@@ -24,7 +24,7 @@ public interface Storage {
      * @param position position
      * @param data     buffer to which data will be written
      */
-    void read(int position, ByteBuffer data);
+    void read(long position, ByteBuffer data);
 
     /**
      * Read data
@@ -32,7 +32,7 @@ public interface Storage {
      * @param position position
      * @param buffer   buffer to which data will be written
      */
-    void read(int position, byte[] buffer);
+    void read(long position, byte[] buffer);
 
-    void scan(int position, ScanFunction scanFunction, Supplier<ByteBuffer> bufferSupplier);
+    void scan(long position, ScanFunction scanFunction, Supplier<ByteBuffer> bufferSupplier);
 }

@@ -14,7 +14,7 @@ import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 
-@Threads(value = 4)
+@Threads(value = 1)
 @Fork(value = 1, jvmArgs = {
         "-server",
         "-Xms512m",
@@ -25,14 +25,16 @@ import java.util.concurrent.TimeUnit;
         "-XX:+UseG1GC",
         "-XX:MaxGCPauseMillis=2000",
         "-XX:GCTimeRatio=4",
-        "-XX:InitiatingHeapOccupancyPercent=30",
+        "-XX:InitiatingHeapOccupancyPercent=70",
         "-XX:G1HeapRegionSize=8M",
         "-XX:ConcGCThreads=2",
         "-XX:G1HeapWastePercent=10",
         "-XX:+UseTLAB",
         "-XX:+ScavengeBeforeFullGC",
         "-XX:+DisableExplicitGC",
-        "-XX:MaxDirectMemorySize=1G"
+        "-XX:MaxDirectMemorySize=1G",
+        "-XX:+UseLargePages",
+        "-XX:+UseCompressedOops"
 })
 @Warmup(iterations = 5, timeUnit = TimeUnit.MILLISECONDS)
 @Measurement(iterations = 10, timeUnit = TimeUnit.MICROSECONDS)
@@ -74,7 +76,7 @@ public class ImStorageBenchmarkTest {
     }
 
     @Benchmark
-    public void scan(ScanContext context, ScanParameters scanParameters) {
+    public void scanFull(ScanContext context, ScanParameters scanParameters) {
         context.imStorage.scan(
                 0,
                 (position, data) -> true,
@@ -96,8 +98,8 @@ public class ImStorageBenchmarkTest {
 
     @State(Scope.Benchmark)
     public static class ScanContext {
-        public static final int ALLOCATED_SIZE = 32 * 1024 * 1024;
-        public static final int OPERATIONS = ALLOCATED_SIZE / Integer.BYTES;
+        public static final long ALLOCATED_SIZE = 512 * 1024 * 1024; // 4GB
+        public static final long OPERATIONS = ALLOCATED_SIZE / Integer.BYTES;
         ImStorage imStorage;
 
         private ByteBuffer byteBuffer = ByteBuffer.allocate(Integer.BYTES);

@@ -5,5 +5,5 @@ import java.nio.ByteBuffer;
 @FunctionalInterface
 public interface ScanFunction {
 
-    boolean accept(int position, ByteBuffer data);
+    boolean accept(long position, ByteBuffer data);
 }

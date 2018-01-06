@@ -1,26 +1,26 @@
 package com.fnklabs.dds.storage.im;
 
+import com.fnklabs.buffer.Buffer;
+import com.fnklabs.buffer.BufferType;
 import com.fnklabs.dds.BytesUtils;
 import com.fnklabs.dds.storage.ScanFunction;
 import com.fnklabs.dds.storage.Storage;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
 public class ImStorage implements Storage {
-    private final ByteBuffer buffer;
+    private final Buffer buffer;
 
-    private final int allocatedSize;
-    private final AtomicInteger actualSizeCounter = new AtomicInteger();
-    private final AtomicInteger itemsCounter = new AtomicInteger();
+    private final long allocatedSize;
     private int pageSize;
 
-    public ImStorage(int maxSize) {
-        buffer = ByteBuffer.allocateDirect(maxSize);
-        buffer.order(ByteOrder.nativeOrder());
+    private AtomicLong writtenData = new AtomicLong();
+
+    public ImStorage(long maxSize) {
+        buffer = BufferType.DIRECT.get(maxSize);
 
         this.allocatedSize = maxSize;
         this.pageSize = 4 * 1024;// 4 kb
@@ -32,30 +32,31 @@ public class ImStorage implements Storage {
     }
 
     @Override
-    public int allocatedSize() {
+    public long allocatedSize() {
         return allocatedSize;
     }
 
     @Override
-    public int actualSize() {
-        return actualSizeCounter.get();
+    public long actualSize() {
+        return allocatedSize;
     }
 
     @Override
-    public int items() {
+    public long items() {
         return itemsCounter.get();
     }
 
     @Override
-    public void write(int position, ByteBuffer data) {
-        actualSizeCounter.addAndGet(data.limit());
-        itemsCounter.incrementAndGet();
+    public void write(long position, ByteBuffer data) {
+
 
         try {
             ByteBuffer buffer = this.buffer.duplicate();
 
-            buffer.position(position);
+            buffer.position((int) position);
             buffer.put(data);
+
+            writtenData.addAndGet(data.capacity());
         } catch (Exception e) {
             LoggerFactory.getLogger(ImStorage.class).warn("can't write data to storage with position {}", position, e);
         }
@@ -63,11 +64,11 @@ public class ImStorage implements Storage {
     }
 
     @Override
-    public void read(int position, ByteBuffer data) {
+    public void read(long position, ByteBuffer data) {
 
         ByteBuffer buffer = this.buffer.asReadOnlyBuffer();
 
-        buffer.position(position);
+        buffer.position((int) position);
 
         while (data.remaining() > 0) {
             data.put(buffer.get());
@@ -76,22 +77,22 @@ public class ImStorage implements Storage {
     }
 
     @Override
-    public void read(int position, byte[] dst) {
+    public void read(long position, byte[] dst) {
         ByteBuffer buffer = this.buffer.asReadOnlyBuffer();
 
-        buffer.position(position);
+        buffer.position((int) position);
 
         buffer.get(dst);
     }
 
     @Override
-    public void scan(int position, ScanFunction scanFunction, Supplier<ByteBuffer> bufferSupplier) {
+    public void scan(long position, ScanFunction scanFunction, Supplier<ByteBuffer> bufferSupplier) {
         ByteBuffer bufferCopy = this.buffer.duplicate();
         ByteBuffer blockBuffer = ByteBuffer.allocate(pageSize);
         ByteBuffer buffer = bufferSupplier.get();
 
         int maxPosition = actualSizeCounter.get();
-        bufferCopy.position(position);
+        bufferCopy.position((int) position);
         int currentPosition = bufferCopy.position();
 
         while (bufferCopy.position() < maxPosition) {

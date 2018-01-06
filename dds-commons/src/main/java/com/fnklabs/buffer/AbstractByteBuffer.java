@@ -14,7 +14,7 @@ abstract class AbstractByteBuffer implements Buffer {
     private final AtomicLong itemsCount = new AtomicLong();
     private final AtomicLong allocatedSize = new AtomicLong(0);
 
-    public AbstractByteBuffer(int size, ByteBuffer buffer) {
+    AbstractByteBuffer(int size, ByteBuffer buffer) {
         buffer.order(ByteOrder.nativeOrder());
 
         this.size = size;
@@ -43,32 +43,12 @@ abstract class AbstractByteBuffer implements Buffer {
     }
 
     @Override
-    public int read(byte[] data) {
-        ByteBuffer buffer = this.buffer.duplicate();
-
-        int currentPosition = buffer.position();
-        buffer.get(data);
-
-        return buffer.position() - currentPosition;
-    }
-
-    @Override
     public void write(long position, byte[] data) {
         Verify.verify(position < size, "position can't be higher that size: %d", size);
 
         ByteBuffer duplicate = buffer.duplicate();
 
         duplicate.position((int) position);
-        duplicate.put(data);
-
-        allocatedSize.addAndGet(data.length);
-        itemsCount.incrementAndGet();
-    }
-
-    @Override
-    public void write(byte[] data) {
-        ByteBuffer duplicate = buffer.duplicate();
-
         duplicate.put(data);
 
         allocatedSize.addAndGet(data.length);

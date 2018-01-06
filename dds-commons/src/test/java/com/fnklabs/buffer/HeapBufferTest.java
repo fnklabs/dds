@@ -16,12 +16,12 @@ public class HeapBufferTest {
 
     @Test
     public void read() {
-        int read = buffer.read(dataBuffer);
-        buffer.read(dataBuffer);
+        int read = buffer.read(0, dataBuffer);
+        buffer.read(0, dataBuffer);
     }
 
     @Test
     public void write() {
-        buffer.write(dataBuffer);
+        buffer.write(0, dataBuffer);
     }
 }

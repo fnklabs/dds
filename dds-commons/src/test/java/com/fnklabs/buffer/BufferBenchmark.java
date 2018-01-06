@@ -34,22 +34,22 @@ public class BufferBenchmark {
 
     @Benchmark
     public void readDirect(DirectContext context) {
-        context.buffer.read(context.dataBuffer);
+        context.buffer.read(0, context.dataBuffer);
     }
 
     @Benchmark
     public void writeDirect(DirectContext context) {
-        context.buffer.write(context.dataBuffer);
+        context.buffer.write(0, context.dataBuffer);
     }
 
     @Benchmark
     public void readHeap(HeapContext context) {
-        context.buffer.read(context.dataBuffer);
+        context.buffer.read(0, context.dataBuffer);
     }
 
     @Benchmark
     public void writeHeap(HeapContext context) {
-        context.buffer.write(context.dataBuffer);
+        context.buffer.write(0, context.dataBuffer);
     }
 
 
@@ -59,7 +59,7 @@ public class BufferBenchmark {
         @Setup
         public void setUp() {
             super.setUp();
-            buffer = Type.DIRECT.get(ALLOCATED_SIZE);
+            buffer = BufferType.DIRECT.get(ALLOCATED_SIZE);
         }
     }
 
@@ -69,7 +69,7 @@ public class BufferBenchmark {
         @Setup
         public void setUp() {
             super.setUp();
-            buffer = Type.HEAP.get(ALLOCATED_SIZE);
+            buffer = BufferType.HEAP.get(ALLOCATED_SIZE);
         }
     }
 
