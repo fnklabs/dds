@@ -4,9 +4,8 @@ import com.fnklabs.dds.storage.column.Column;
 import com.fnklabs.dds.storage.query.Condition;
 
 import java.util.List;
-import java.util.Set;
 
-public interface Table<C extends Chunk> {
+public interface Table {
     List<Column> columns();
 
     /**
@@ -15,13 +14,6 @@ public interface Table<C extends Chunk> {
      * @return table name
      */
     String name();
-
-    /**
-     * Chunk from which current table is consist
-     *
-     * @return set of chunks
-     */
-    Set<C> chunks();
 
     /**
      * Write data into table

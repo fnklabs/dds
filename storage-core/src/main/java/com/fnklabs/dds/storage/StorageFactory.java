@@ -1,5 +1,5 @@
 package com.fnklabs.dds.storage;
 
-public interface StorageFactory {
-    Storage get(int size);
+public interface StorageFactory<T extends StorageOptions> {
+    TableStorage get(T storageOptions);
 }
