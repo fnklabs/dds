@@ -1,4 +1,4 @@
-package com.fnklabs.dds.coordinator.exception;
+package com.fnklabs.dds.cluster.exception;
 
 /**
  * Node is not available for operations

@@ -1,4 +1,4 @@
-package com.fnklabs.dds.storage;
+package com.fnklabs.dds.index;
 
 import com.fnklabs.dds.index.BIndex;
 import com.fnklabs.dds.index.IndexExists;
@@ -7,6 +7,7 @@ import org.junit.*;
 import java.io.File;
 import java.nio.ByteBuffer;
 
+@Ignore
 public class BIndexTest {
     private static final File INDEX_FILE = new File("test.idx");
     public static final int MAX_INSERTS = 100_000;

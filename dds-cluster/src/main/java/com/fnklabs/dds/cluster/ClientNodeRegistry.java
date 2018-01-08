@@ -17,8 +17,8 @@ import java.util.Enumeration;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
-class NodeClientRegistry {
-    private static final Logger LOGGER = LoggerFactory.getLogger(NodeClientRegistry.class);
+class ClientNodeRegistry {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ClientNodeRegistry.class);
 
     private final int poolSize;
 
@@ -26,13 +26,16 @@ class NodeClientRegistry {
 
     private final NetworkExecutor networkExecutor;
 
-    NodeClientRegistry(int poolSize) throws IOException {
+    private final Serializer serializer;
+
+    ClientNodeRegistry(int poolSize, Serializer serializer) throws IOException {
         this.poolSize = poolSize;
 
         networkExecutor = NioExecutor.builder()
                                      .setOpReadExecutor(poolSize)
                                      .setOpWriteExecutor(poolSize)
                                      .build();
+        this.serializer = serializer;
     }
 
     /**
@@ -85,12 +88,9 @@ class NodeClientRegistry {
         return false;
     }
 
-    @Nullable
-    private static Node build(@NotNull HostAndPort hostAndPort) {
-        return new NodeProxy();
+    private Node build(@NotNull HostAndPort hostAndPort) {
+        return new NodeProxy(hostAndPort, serializer);
     }
 
-    static {
 
-    }
 }

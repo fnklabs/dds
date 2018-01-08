@@ -50,7 +50,7 @@ public interface Node extends Closeable, Comparable<Node> {
      *
      * @return
      */
-    Version getVersion();
+    ClusterVersion getVersion();
 
     Configuration getConfiguration();
 

@@ -2,26 +2,24 @@ dependencies {
     compile project(":dds-core")
     compile project(":dds-commons")
 
-    compile 'org.slf4j:slf4j-api:1.7.9'
-    compile 'ch.qos.logback:logback-classic:1.1.2'
-    compile 'com.esotericsoftware:kryo:3.0.2'
+    compile "org.projectlombok:lombok:$vers.lombok"
 
-    compile 'com.ecyrd.speed4j:speed4j:0.12'
+    compile "org.slf4j:slf4j-api:$vers.slf4j"
+    compile "ch.qos.logback:logback-classic:$vers.logback"
 
-    compile 'org.apache.commons:commons-lang3:3.3.2'
-    compile 'org.apache.commons:commons-io:1.3.2'
+    compile "org.apache.commons:commons-lang3:3.3.2"
+    compile "org.apache.commons:commons-io:1.3.2"
 
-    compile 'com.google.guava:guava:18.0'
+    compile "com.google.guava:guava:$vers.guava"
 
-    compile 'junit:junit:4.12'
-    compile 'org.mockito:mockito-all:1.9.5'
+    compile "com.typesafe:config:1.2.1"
 
-    compile 'io.dropwizard.metrics:metrics-core:3.1.0'
-    compile 'com.typesafe:config:1.2.1'
+    compile "joda-time:joda-time:$vers.jodatime"
+    compile "com.intellij:annotations:$vers.intellij"
 
-    compile 'joda-time:joda-time:2.5'
-    compile 'com.intellij:annotations:12.0'
+    compile "com.fnklabs:fnklabs-metrics-codahale:$vers.metrics"
+    compile "com.fnklabs:fnklabs-metrics-core:$vers.metrics"
 
-    compile 'com.fnklabs:fnklabs-metrics-codahale:0.1.5'
-    compile 'com.fnklabs:fnklabs-metrics-core:0.1.5'
+    testCompile "junit:junit:$vers.junit"
+    testCompile "org.mockito:mockito-core:$vers.mockito"
 }

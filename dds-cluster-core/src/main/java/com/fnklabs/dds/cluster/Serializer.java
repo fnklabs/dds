@@ -1,4 +1,9 @@
 package com.fnklabs.dds.cluster;
 
-public class Serializer {
+import java.nio.ByteBuffer;
+
+public interface Serializer {
+    <T> ByteBuffer write(T object);
+
+    <T> T read(ByteBuffer buffer, Class<T> clazz);
 }

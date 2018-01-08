@@ -1,13 +1,15 @@
-package com.fnklabs.dds.coordinator.partition;
+package com.fnklabs.dds.cluster.partition;
 
-import com.fnklabs.dds.coordinator.partition.exception.RepartitionIllegalOperation;
+import com.fnklabs.dds.cluster.Node;
+import com.fnklabs.dds.cluster.partition.exception.RepartitionIllegalOperation;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.HashFunction;
 import com.google.common.hash.Hashing;
-import com.google.common.net.HostAndPort;
 
-import java.math.BigInteger;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.SortedSet;
 import java.util.stream.Collectors;
 
 /**
@@ -17,27 +19,12 @@ public class Partitioner {
     /**
      * Min token value
      */
-    public final static byte[] MIN_TOKEN_VALUE = new byte[]{
-            Byte.MIN_VALUE, Byte.MIN_VALUE, Byte.MIN_VALUE, Byte.MIN_VALUE,
-            Byte.MIN_VALUE, Byte.MIN_VALUE, Byte.MIN_VALUE, Byte.MIN_VALUE,
-            Byte.MIN_VALUE, Byte.MIN_VALUE, Byte.MIN_VALUE, Byte.MIN_VALUE,
-            Byte.MIN_VALUE, Byte.MIN_VALUE, Byte.MIN_VALUE, Byte.MIN_VALUE,
-    };
+    public final static long MIN_TOKEN_VALUE = Long.MIN_VALUE;
 
     /**
      * Max token value
      */
-    public final static byte[] MAX_TOKEN_VALUE = new byte[]{
-            Byte.MAX_VALUE, Byte.MAX_VALUE, Byte.MAX_VALUE, Byte.MAX_VALUE,
-            Byte.MAX_VALUE, Byte.MAX_VALUE, Byte.MAX_VALUE, Byte.MAX_VALUE,
-            Byte.MAX_VALUE, Byte.MAX_VALUE, Byte.MAX_VALUE, Byte.MAX_VALUE,
-            Byte.MAX_VALUE, Byte.MAX_VALUE, Byte.MAX_VALUE, Byte.MAX_VALUE,
-    };
-
-    /**
-     * Token length in bytes
-     */
-    public final static int TOKEN_LENGTH = 16; // 128 bit or 16 byte
+    public final static long MAX_TOKEN_VALUE = Long.MAX_VALUE;
 
     public static final int PARTITIONS_PER_NODE = 256;
     /**
@@ -52,10 +39,8 @@ public class Partitioner {
      *
      * @return
      */
-    public static PartitionKey buildPartitionKey(byte[] key) {
-        byte[] token = hash(key);
-
-        return new PartitionKey(new BigInteger(token));
+    public static long buildPartitionKey(byte[] key) {
+        return hash(key);
     }
 
     /**
@@ -66,22 +51,16 @@ public class Partitioner {
      * @return Set of partition
      */
     public static Set<Partition> split(int numberOfPartitions) {
-        BigInteger step = new BigInteger(MAX_TOKEN_VALUE).shiftLeft(1).divide(BigInteger.valueOf(numberOfPartitions));
-        BigInteger maxValue = new BigInteger(MAX_TOKEN_VALUE);
+        long step = MAX_TOKEN_VALUE / 2 / numberOfPartitions;
 
         Set<Partition> partitions = new HashSet<>();
 
-        BigInteger leftBorder = new BigInteger(MIN_TOKEN_VALUE);
+        long leftBorder = MIN_TOKEN_VALUE;
 
         for (int i = 0; i < numberOfPartitions; i++) {
-            BigInteger rightBorder = leftBorder.add(step);//.subtract(BigInteger.ONE);
-            Partition partition;
+            long rightBorder = leftBorder + step;
 
-            if (rightBorder.compareTo(maxValue) != 0) {
-                partition = new Partition(new PartitionKey(leftBorder), new PartitionKey(rightBorder.subtract(BigInteger.ONE)), Partition.State.BALANCING);
-            } else {
-                partition = new Partition(new PartitionKey(leftBorder), new PartitionKey(rightBorder), Partition.State.BALANCING);
-            }
+            Partition partition = new PartitionImpl(leftBorder, rightBorder, PartitionState.BALANCING);
 
             partitions.add(partition);
 
@@ -99,31 +78,35 @@ public class Partitioner {
      *
      * @return Partition table
      */
-    public static PartitionTable buildPartitionTable(final SortedSet<UUID> members, final int replicationFactor) throws RepartitionIllegalOperation {
+    public static PartitionTable buildPartitionTable(final SortedSet<Node> members, final int replicationFactor) throws RepartitionIllegalOperation {
         if (members.size() < replicationFactor) {
             throw new RepartitionIllegalOperation(replicationFactor, members.size());
         }
 
         Set<Partition> partitionSet = split(members.size() * PARTITIONS_PER_NODE);
 
-        PartitionTable partitionTable = new PartitionTable();
+        PartitionTableImpl partitionTable = new PartitionTableImpl();
 
         for (int memberIndex = 0; memberIndex < members.size(); memberIndex++) {
             int offset = PARTITIONS_PER_NODE * memberIndex;
-            Set<Partition> partitionsForMember = partitionSet.stream().skip(offset).limit(PARTITIONS_PER_NODE).collect(Collectors.toSet());
+
+            Set<Partition> partitionsForMember = partitionSet.stream()
+                                                             .skip(offset)
+                                                             .limit(PARTITIONS_PER_NODE)
+                                                             .collect(Collectors.toSet());
 
             for (Partition partition : partitionsForMember) {
 
                 for (int replicationFactorIndex = 0; replicationFactorIndex < replicationFactor; replicationFactorIndex++) {
                     int partitionOwnerIndex = (memberIndex + replicationFactorIndex) % members.size();
 
-                    UUID partitionOwner = new ArrayList<>(members).get(partitionOwnerIndex);
+                    Node partitionOwner = new ArrayList<>(members).get(partitionOwnerIndex);
 
                     partitionTable.addPartition(partition, partitionOwner);
                 }
-
             }
         }
+
 
         return partitionTable;
     }
@@ -135,9 +118,9 @@ public class Partitioner {
      *
      * @return Internal key
      */
-    protected static byte[] hash(byte[] key) {
+    private static long hash(byte[] key) {
         HashCode hashCode = HASH_FUNCTION.hashBytes(key);
-        return hashCode.asBytes();
+        return hashCode.asLong();
     }
 
 

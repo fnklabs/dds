@@ -3,7 +3,7 @@ syntax = "proto2";
 package cluster.proto;
 
 option java_multiple_files = true;
-option java_package = "com.fnklabs.dds";
+option java_package = "com.fnklabs.dds.cluster";
 
 message NodeInfo {
     required int64 id = 1;
@@ -13,6 +13,6 @@ message ClusterInfo {
     required int64 id = 1;
 }
 
-enum Version {
+enum ClusterVersion {
     VERSION_1 = 1;
 }

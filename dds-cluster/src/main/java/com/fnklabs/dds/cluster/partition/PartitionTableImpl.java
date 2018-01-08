@@ -1,43 +1,51 @@
 package com.fnklabs.dds.cluster.partition;
 
-import com.google.common.collect.Sets;
-import org.jetbrains.annotations.NotNull;
+import com.fnklabs.dds.cluster.Node;
+import org.jetbrains.annotations.Nullable;
 
-import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.BiFunction;
 
 /**
- * Contains data about partition - who own partitions
+ * Contains data about partitionOwners - who own partitions
  */
-public class PartitionTable implements Serializable {
-    @NotNull
-    private final Map<PartitionImpl, Set<UUID>> partition = new ConcurrentHashMap<>();
+class PartitionTableImpl implements PartitionTable {
+    private final Map<Partition, List<Node>> partitionOwners = new ConcurrentHashMap<>();
 
-    public PartitionTable() {
-    }
 
-    @NotNull
-    public Map<PartitionImpl, Set<UUID>> getPartition() {
-        return partition;
-    }
-
-    public void addPartition(PartitionImpl partition, UUID member) {
-        this.partition.compute(partition, new BiFunction<PartitionImpl, Set<UUID>, Set<UUID>>() {
-            @Override
-            public Set<UUID> apply(PartitionImpl partition, Set<UUID> members) {
-
-                if (members != null) {
-                    members.add(member);
-                } else {
-                    members = Sets.newHashSet(member);
-                }
-
-                return members;
+    void addPartition(Partition partition, Node node) {
+        partitionOwners.compute(partition, (p, o) -> {
+            if (o == null) {
+                o = new ArrayList<>();
             }
+
+            o.add(node);
+
+            return o;
         });
+    }
+
+    @Nullable
+    @Override
+    public Node getOwner(Partition partition) {
+        List<Node> owners = this.partitionOwners.get(partition);
+
+        return owners.isEmpty() ? null : owners.get(0);
+    }
+
+    @Nullable
+    @Override
+    public Node getOwner(long token) {
+        for (Map.Entry<Partition, List<Node>> partitionListEntry : partitionOwners.entrySet()) {
+            Partition key = partitionListEntry.getKey();
+
+            if (key.owned(token)) {
+                return partitionListEntry.getValue().get(0);
+            }
+        }
+
+        return null;
     }
 }

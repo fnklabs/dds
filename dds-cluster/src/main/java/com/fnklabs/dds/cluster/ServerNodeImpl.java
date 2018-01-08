@@ -1,13 +1,9 @@
 package com.fnklabs.dds.cluster;
 
 import com.fnklabs.concurrent.Executors;
-import com.fnklabs.dds.cluster.partition.PartitionTable;
-import com.fnklabs.dds.cluster.partition.Partitioner;
-import com.fnklabs.dds.cluster.partition.exception.RepartitionIllegalOperation;
 import com.fnklabs.dds.network.pool.NetworkExecutor;
 import com.fnklabs.dds.network.pool.NioExecutor;
 import com.fnklabs.dds.network.server.NetworkServer;
-import com.google.common.collect.Sets;
 import com.google.common.net.HostAndPort;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -18,7 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.TreeSet;
+import java.util.SortedSet;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -28,24 +24,21 @@ import java.util.concurrent.atomic.AtomicReference;
 /**
  * Server node implementation
  */
-class NodeImpl implements Node {
-    private final UUID id = UUID.randomUUID();
-
+class ServerNodeImpl implements Node {
     /**
      * Logger
      */
-    private static final Logger LOGGER = LoggerFactory.getLogger(NodeImpl.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(ServerNodeImpl.class);
 
+    private final UUID id = UUID.randomUUID();
     /**
      * Network server instance
      */
-
     private final NetworkServer networkServer;
 
     /**
      * Executor service
      */
-
     private final ExecutorService serverPool;
 
     /**
@@ -57,13 +50,12 @@ class NodeImpl implements Node {
     /**
      * Atomic reference to last actual node status
      */
-    private final AtomicReference<NodeStatus> nodeStatus = new AtomicReference<>(NodeStatus.START_UP);
+    private final AtomicReference<NodeStatus> nodeStatus = new AtomicReference<>();
 
     /**
      *
      */
-
-    private final ServerNodeClientFactory serverNodeClientFactory;
+    private final ClientNodeRegistry clientNodeRegistry;
 
     /**
      * Cluster information reference
@@ -72,17 +64,21 @@ class NodeImpl implements Node {
 
     private final NetworkExecutor networkExecutor;
 
+    private final Configuration configuration;
+
+    private final ClusterImpl cluster;
+
     /**
      * Construct new local node
      *
-     * @param listenAddressAndPort    Local node address on which server will bind
-     * @param workers                 Executor service
-     * @param serverNodeClientFactory ServerNodeClient factory
+     * @param configuration Server node configuration
      */
-    NodeImpl(Configuration configuration, ServerNodeClientFactory serverNodeClientFactory) throws IOException {
+    ServerNodeImpl(Configuration configuration) throws IOException {
+        KryoSerializer serializer = new KryoSerializer();
 
+        this.configuration = configuration;
         this.serverPool = Executors.fixedPoolExecutor(configuration.getWorkerPoolSize(), "dds.server.worker");
-        this.serverNodeClientFactory = serverNodeClientFactory;
+        this.clientNodeRegistry = new ClientNodeRegistry(configuration.getNetworkPoolSize(), serializer);
 
         this.networkExecutor = NioExecutor.builder()
                                           .setOpAcceptExecutor(configuration.getNioPoolSize())
@@ -95,16 +91,24 @@ class NodeImpl implements Node {
         for (int i = 0; i < configuration.getWorkerPoolSize(); i++) {
             getServerPool().submit(new WatchDog(this, isRunning));
         }
+        cluster = new ClusterImpl(configuration.seeds(), clientNodeRegistry, serializer);
     }
 
     /**
      * Start server node
      */
     public void start() throws IOException {
-        isRunning.set(true);
-        networkExecutor.run();
+        NodeStatus nodeStatus = this.nodeStatus.get();
 
-        networkServer.join(networkExecutor);
+        if (nodeStatus == null && this.nodeStatus.compareAndSet(null, NodeStatus.START_UP)) {
+            isRunning.set(true);
+            networkExecutor.run();
+
+            networkServer.join(networkExecutor);
+
+            SortedSet<Node> members = cluster.getMembers();
+
+        }
     }
 
     @Override
@@ -122,18 +126,16 @@ class NodeImpl implements Node {
         }
 
         networkExecutor.shutdown();
-
-
     }
 
     @Override
     public UUID getId() {
-        return null;
+        return id;
     }
 
     @Override
     public NodeStatus getStatus() {
-        return null;
+        return nodeStatus.get();
     }
 
     @Override
@@ -143,27 +145,22 @@ class NodeImpl implements Node {
 
     @Override
     public HostAndPort getAddress() {
-        return null;
+        return configuration.listenAddress();
     }
 
     @Override
     public Version getVersion() {
-        return null;
+        return Version.current();
     }
 
     @Override
     public Configuration getConfiguration() {
-        return null;
-    }
-
-    @Override
-    public HostAndPort getAddressAndPort() {
-        return null;//networkServer.getListenAddress();
+        return configuration;
     }
 
     /**
      * Notify server that specified node was up or can be used to update information about node instead of using {@link
-     * NodeImpl#updateClusterInfo(Cluster)}  to update information about whole cluster.
+     * ServerNodeImpl#updateClusterInfo(Cluster)}  to update information about whole cluster.
      *
      * @param nodeInfo New node info
      *
@@ -173,39 +170,8 @@ class NodeImpl implements Node {
     public ListenableFuture<Cluster> nodeUp(Node nodeInfo) {
         LOGGER.info("Node up: {}", nodeInfo);
 
-        ListenableFuture<Cluster> clusterInfoFuture = getClusterInfo();
 
-
-        return Futures.transform(clusterInfoFuture, (Cluster input) -> {
-//            NodeInfo currentNodeInfo = getCurrentNodeInfo();
-//
-//            TreeSet<NodeInfo> members = new TreeSet<>();
-//            members.addAll(input.getMembers());
-//            members.remove(currentNodeInfo);
-//            members.add(currentNodeInfo);
-//            members.add(nodeInfo);
-//
-//            Cluster clusterInformation = new Cluster(members, currentNodeInfo, input.getPartitionTable());
-//
-//            return Futures.transform(updateClusterInfo(clusterInformation), new com.google.common.base.Function<Boolean, Cluster>() {
-//                @Override
-//                public Cluster apply(Boolean updateStatus) {
-//                    if (updateStatus && !input.getMembers().contains(nodeInfo)) {
-//                        for (; ; ) {
-//                            NodeStatus nodeStatus = NodeImpl.this.nodeStatus.get();
-//                            if (updateNodeStatus(nodeStatus, NodeStatus.REPAIR)) {
-//                                break;
-//                            }
-//                        }
-//                    }
-//
-//                    return clusterInformation;
-//                }
-//            });
-
-            return null;
-
-        });
+        return null;
     }
 
     /**
@@ -223,16 +189,7 @@ class NodeImpl implements Node {
     public ListenableFuture<Boolean> nodeDown(Node nodeInfo) {
         LOGGER.info("Node down: {}", nodeInfo);
 
-        return Futures.transform(getClusterInfo(), (Cluster input) -> {
-//            TreeSet<NodeInfo> members = new TreeSet<>();
-//            members.addAll(input.getMembers());
-//            members.remove(nodeInfo);
-//
-//            Cluster clusterInformation = new Cluster(members, getCurrentNodeInfo(), input.getPartitionTable());
-//
-//            return updateClusterInfo(clusterInformation);
-            return null;
-        }, getServerPool());
+        return null;
 
     }
 
@@ -245,19 +202,11 @@ class NodeImpl implements Node {
      */
     @Override
     public ListenableFuture<Boolean> repair(Cluster clusterInformation) {
-        ListenableFuture<Boolean> resultFuture = updateClusterInfo(clusterInformation);
-
-        return Futures.transform(resultFuture, (Boolean result) -> {
-            if (result) {
-                nodeStatus.set(NodeStatus.REPAIR);
-            }
-
-            return true;
-        }, getServerPool());
+        return null;
     }
 
     @Override
-    public ListenableFuture<Node> getNode() {
+    public Node getNode() {
         return null;
     }
 
@@ -267,11 +216,8 @@ class NodeImpl implements Node {
      * @return RingInfo
      */
     @Override
-    public ListenableFuture<Cluster> getClusterInfo() {
-        SettableFuture<Cluster> clusterInformationSettableFuture = SettableFuture.<Cluster>create();
-        clusterInformationSettableFuture.set(getCluster());
-
-        return clusterInformationSettableFuture;
+    public ListenableFuture<Boolean> update() {
+        return null;
     }
 
     @Override
@@ -312,53 +258,6 @@ class NodeImpl implements Node {
 
     protected NodeStatus getNodeStatus() {
         return nodeStatus.get();
-    }
-
-
-    protected ClusterStatus getClusterStatus() {
-        Cluster clusterInformation = getCluster();
-        return clusterInformation == null ? ClusterStatus.UNKNOWN : clusterInformation.getClusterStatus();
-    }
-
-
-    private boolean isSynchronizing() {
-        return getNodeStatus() == NodeStatus.REPAIR || getNodeStatus() == NodeStatus.SYNCHRONIZATION;
-    }
-
-    private boolean ifAvailableForOperations() {
-        NodeStatus nodeStatus = this.nodeStatus.get();
-
-        return nodeStatus == NodeStatus.UP
-                || nodeStatus == NodeStatus.REPAIR
-                || nodeStatus == NodeStatus.SYNCHRONIZATION
-                || nodeStatus == NodeStatus.DOWN
-                || nodeStatus == NodeStatus.SHUTDOWN;
-    }
-
-    private void setUp() {
-        TreeSet<Node> members = new TreeSet<>(Sets.newHashSet(getCurrentNodeInfo()));
-
-        try {
-            PartitionTable partitionTable = Partitioner.buildPartitionTable(members, getConfiguration().replicationFactor());
-
-            Cluster clusterInformation = new ClusterImpl();
-
-            updateClusterInfo(clusterInformation);
-        } catch (RepartitionIllegalOperation repartitionIllegalOperation) {
-            LOGGER.warn("Cant build partition table", repartitionIllegalOperation);
-        }
-
-
-    }
-
-
-    private Node getServerNodeClientInstance(HostAndPort nodeAddress) {
-        return serverNodeClientFactory.getInstance(nodeAddress);
-    }
-
-
-    private Node getCurrentNodeInfo() {
-        return null;//new NodeInfo(configuration.getNodeId(), getAddressAndPort(), ApiVersion.VERSION_1, nodeStatus.get());
     }
 
 

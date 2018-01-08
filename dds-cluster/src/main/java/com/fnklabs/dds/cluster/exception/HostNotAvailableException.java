@@ -1,4 +1,4 @@
-package com.fnklabs.dds.coordinator.exception;
+package com.fnklabs.dds.cluster.exception;
 
 import com.google.common.net.HostAndPort;
 

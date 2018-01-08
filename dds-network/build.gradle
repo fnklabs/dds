@@ -2,7 +2,7 @@ dependencies {
     compile "org.projectlombok:lombok:$vers.lombok"
 
     compile "ch.qos.logback:logback-core:$vers.logback"
-    compile 'ch.qos.logback:logback-classic:$vers.logback'
+    compile "ch.qos.logback:logback-classic:$vers.logback"
 
     compile "org.apache.commons:commons-lang3:3.3.2"
     compile "org.apache.commons:commons-io:1.3.2"

@@ -1,4 +1,4 @@
-package com.fnklabs.dds.storage;
+package com.fnklabs.dds.index;
 
 import java.nio.ByteBuffer;
 

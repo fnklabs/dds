@@ -1,4 +1,4 @@
-package com.fnklabs.dds.coordinator.partition.exception;
+package com.fnklabs.dds.cluster.partition.exception;
 
 public class RepartitionIllegalOperation extends RuntimeException {
     private final int replicationFactor;

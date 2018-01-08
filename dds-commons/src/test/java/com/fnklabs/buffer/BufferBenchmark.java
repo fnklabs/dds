@@ -38,18 +38,32 @@ public class BufferBenchmark {
     }
 
     @Benchmark
-    public void writeDirect(DirectContext context) {
-        context.buffer.write(0, context.dataBuffer);
-    }
-
-    @Benchmark
     public void readHeap(HeapContext context) {
         context.buffer.read(0, context.dataBuffer);
     }
 
     @Benchmark
+    public void writeDirect(DirectContext context) {
+        context.buffer.write(0, context.dataBuffer);
+    }
+
+    @Benchmark
     public void writeHeap(HeapContext context) {
         context.buffer.write(0, context.dataBuffer);
+    }
+
+    @Benchmark
+    public void scanDirect(DirectContext context) {
+        for (int i = 0; i < context.bufferSize; i += context.bufferSize) {
+            context.buffer.read(0, context.dataBuffer);
+        }
+    }
+
+    @Benchmark
+    public void scanHeap(HeapContext context) {
+        for (int i = 0; i < context.bufferSize; i += context.bufferSize) {
+            context.buffer.read(0, context.dataBuffer);
+        }
     }
 
 

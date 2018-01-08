@@ -1,4 +1,4 @@
-package com.fnklabs.dds.storage;
+package com.fnklabs.dds.index;
 
 import com.fnklabs.dds.index.Node;
 import com.fnklabs.dds.index.NodeUtils;

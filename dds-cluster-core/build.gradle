@@ -1,3 +1,44 @@
 dependencies {
-    compile project(":dds-network")
+    compile 'com.google.protobuf:protobuf-java:3.5.0'
+    compile "com.google.guava:guava:$vers.guava"
+
+    compile "joda-time:joda-time:$vers.jodatime"
+    compile "com.intellij:annotations:$vers.intellij"
+
+    compile "org.slf4j:slf4j-api:$vers.slf4j"
+
+    testCompile "junit:junit:$vers.junit"
+    testCompile "org.mockito:mockito-core:$vers.mockito"
+    testCompile "ch.qos.logback:logback-core:$vers.logback"
+    testCompile "ch.qos.logback:logback-classic:$vers.logback"
+}
+
+idea {
+    module {
+        generatedSourceDirs = [ file("src/main/generated") ]
+
+        sourceDirs += file("src/main/java")
+        sourceDirs += file("src/main/generated")
+    }
+}
+
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:3.5.0"
+    }
+    generateProtoTasks {
+        all().each { task ->
+            task.builtins {
+                java {
+                    outputSubDir = 'generated'
+                }
+            }
+        }
+    }
+
+    generatedFilesBaseDir = "${projectDir}/src/"
+}
+
+clean {
+    delete 'src/main/generated'
 }

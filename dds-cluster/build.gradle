@@ -1,3 +1,9 @@
 dependencies {
-   
+    compile project(":dds-cluster-core")
+    compile project(":dds-network")
+
+    compile "org.slf4j:slf4j-api:$vers.slf4j"
+
+    testCompile "junit:junit:$vers.junit"
+    testCompile "org.mockito:mockito-core:$vers.mockito"
 }

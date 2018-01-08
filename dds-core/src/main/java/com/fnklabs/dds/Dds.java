@@ -1,4 +1,5 @@
 package com.fnklabs.dds;
 
-public class Dds {
+public interface Dds {
+    Table table(String name);
 }

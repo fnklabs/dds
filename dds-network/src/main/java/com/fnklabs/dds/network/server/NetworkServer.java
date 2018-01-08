@@ -54,7 +54,7 @@ public class NetworkServer implements Closeable {
      *
      * @param incomeMessageHandler New message handler
      */
-    NetworkServer(HostAndPort listenAddress, int workers, IncomeMessageHandler incomeMessageHandler) {
+    public NetworkServer(HostAndPort listenAddress, int workers, IncomeMessageHandler incomeMessageHandler) {
         this.listenAddress = listenAddress;
 
         incomeMessageQueue = new ArrayBlockingQueue<>(10_000);

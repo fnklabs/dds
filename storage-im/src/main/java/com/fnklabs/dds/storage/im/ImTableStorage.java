@@ -8,6 +8,7 @@ import com.google.common.base.Verify;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
 public class ImTableStorage implements TableStorage {
@@ -17,6 +18,7 @@ public class ImTableStorage implements TableStorage {
 
     private final Map<Integer, Buffer> buffers = new ConcurrentHashMap<>();
 
+    private final AtomicLong lastPosition = new AtomicLong();
 
     public ImTableStorage(long maxSize) {
         this(maxSize, 4 * 1024, 512 * 1024 * 1024);
@@ -80,6 +82,7 @@ public class ImTableStorage implements TableStorage {
             dataOffset += dataToCopy;
         }
 
+        lastPosition.addAndGet(position + data.length);
     }
 
     @Override
@@ -88,7 +91,7 @@ public class ImTableStorage implements TableStorage {
 
         long positionOffset = 0;
 
-        while (positionOffset < maxSize) {
+        while (positionOffset < lastPosition.get()) {
             read(positionOffset, buffer);
 
             if (scanFunction.accept(positionOffset, buffer)) {
@@ -99,51 +102,4 @@ public class ImTableStorage implements TableStorage {
             break;
         }
     }
-
-//    @Override
-//    public void read(long position, byte[] dst) {
-//        ByteBuffer buffer = this.buffer.asReadOnlyBuffer();
-//
-//        buffer.position((int) position);
-//
-//        buffer.get(dst);
-//    }
-
-//    @Override
-//    public void scan(long position, ScanFunction scanFunction, Supplier<ByteBuffer> bufferSupplier) {
-//        ByteBuffer bufferCopy = this.buffer.duplicate();
-//        ByteBuffer blockBuffer = ByteBuffer.allocate(buffeSize);
-//        ByteBuffer buffer = bufferSupplier.get();
-//
-//        int maxPosition = actualSizeCounter.get();
-//        bufferCopy.position((int) position);
-//        int currentPosition = bufferCopy.position();
-//
-//        while (bufferCopy.position() < maxPosition) {
-//
-//            BytesUtils.read(bufferCopy, blockBuffer);
-//
-//            blockBuffer.rewind();
-//            int blockIndex = 0;
-//
-//            while (blockBuffer.remaining() > buffer.capacity()) { // read all from buffer
-//
-//                BytesUtils.read(blockBuffer, buffer);
-//
-//                buffer.rewind();
-//
-//                if (!scanFunction.accept(currentPosition + blockIndex * buffer.capacity(), buffer)) {
-//                    return;
-//                }
-//
-//                blockIndex++;
-//                buffer.clear();
-//            }
-//
-//            currentPosition = currentPosition + blockBuffer.position();
-//
-//            blockBuffer.compact();
-//
-//        }
-//    }
 }

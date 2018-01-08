@@ -1,6 +1,7 @@
-package com.fnklabs.dds.storage;
+package com.fnklabs.dds.index;
 
 import com.fnklabs.dds.BytesUtils;
+import com.fnklabs.dds.IOUtils;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -488,7 +489,7 @@ class BIndex implements Index {
 
             return Optional.of(Header.fromByteBuffer(buffer));
         } catch (IOException e) {
-            LOGGER.error("Can't read header", e);
+            LOGGER.error("Can't get header", e);
 
             return Optional.empty();
         }

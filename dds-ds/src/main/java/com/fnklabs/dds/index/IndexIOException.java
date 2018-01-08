@@ -1,6 +1,4 @@
-package com.fnklabs.dds.storage;
-
-import java.io.*;
+package com.fnklabs.dds.index;
 
 public class IndexIOException extends IndexException {
     public IndexIOException(Exception e) {

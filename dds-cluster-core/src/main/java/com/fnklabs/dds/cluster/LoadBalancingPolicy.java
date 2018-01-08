@@ -8,28 +8,28 @@ public interface LoadBalancingPolicy {
      *
      * @param peer peer
      */
-    void add(NodeInfo peer);
+    void add(Node peer);
 
     /**
      * Remove peer from balance peers
      *
      * @param peer peer
      */
-    void remove(NodeInfo peer);
+    void remove(Node peer);
 
     /**
      * Get next peer
      *
      * @return next peer
      */
-    NodeInfo next();
+    Node next();
 
     /**
      * Retrieve query plan for specified operation
      *
      * @return List of T for execution
      */
-    List<NodeInfo> getExecutionPlan();
+    List<Node> getExecutionPlan();
 
     /**
      * Get number of peers
