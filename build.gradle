@@ -7,7 +7,7 @@ buildscript {
     }
     dependencies {
         classpath 'com.google.protobuf:protobuf-gradle-plugin:0.8.3'
-        classpath "me.champeau.gradle:jmh-gradle-plugin:0.4.4"
+        classpath "me.champeau.gradle:jmh-gradle-plugin:0.4.5"
     }
 }
 
@@ -56,21 +56,21 @@ subprojects {
                 logback : '1.2.3',
 
                 metrics : '0.1.14',
-                lombok  : '1.16.12',
+                lombok  : '1.16.20',
                 slf4j   : '1.7.25',
                 spring  : '4.3.4.RELEASE',
         ]
     }
 
-    jar << {
-        copy {
-            into "${rootProject.buildDir}/lib"
-            from configurations.runtime
-            from project.jar.archivePath
-        }
-    }
+//    jar << {
+//        copy {
+//            into "${rootProject.buildDir}/lib"
+//            from configurations.runtime
+//            from project.jar.archivePath
+//        }
+//    }
 }
 
 task wrapper(type: Wrapper) {
-    gradleVersion = '4.2.1'
+    gradleVersion = '4.3.1'
 }

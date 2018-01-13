@@ -4,7 +4,7 @@ import com.fnklabs.dds.storage.Chunk;
 import com.fnklabs.dds.storage.Record;
 import com.fnklabs.dds.storage.Storage;
 import com.fnklabs.dds.storage.column.Column;
-import com.fnklabs.dds.storage.query.Condition;
+import com.fnklabs.dds.table.query.Condition;
 import com.fnklabs.metrics.Counter;
 import com.fnklabs.metrics.MetricsFactory;
 import com.fnklabs.metrics.Timer;

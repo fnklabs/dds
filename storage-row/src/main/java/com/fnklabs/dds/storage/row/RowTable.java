@@ -5,7 +5,7 @@ import com.fnklabs.dds.storage.Reducer;
 import com.fnklabs.dds.storage.StorageFactory;
 import com.fnklabs.dds.storage.Table;
 import com.fnklabs.dds.storage.column.Column;
-import com.fnklabs.dds.storage.query.Condition;
+import com.fnklabs.dds.table.query.Condition;
 import com.fnklabs.metrics.MetricsFactory;
 import com.fnklabs.metrics.Timer;
 import com.google.common.collect.Sets;

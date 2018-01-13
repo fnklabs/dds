@@ -6,12 +6,14 @@ include "dds-commons"
 include "dds-core"
 include "dds-ds"
 include "dds-network"
+
 include "dds-storage-core"
-//include "dds-storage-columnar"
 include "dds-storage-im"
-//include "dds-storage-row"
+
+include "dds-table-core"
+include "dds-table-columnar"
 
 project(":dds-storage-core").projectDir = file("storage-core")
 project(":dds-storage-im").projectDir = file("storage-im")
-//project(":dds-storage-columnar").projectDir = file("storage-columnar")
-//project(":dds-storage-row").projectDir = file("storage-row")
+project(":dds-table-core").projectDir = file("table-core")
+project(":dds-table-columnar").projectDir = file("table-columnar")

@@ -5,7 +5,7 @@ import com.fnklabs.dds.storage.column.Column;
 import com.fnklabs.dds.storage.column.IntegerColumn;
 import com.fnklabs.dds.storage.column.LongColumn;
 import com.fnklabs.dds.storage.im.ImStorageFactory;
-import com.fnklabs.dds.storage.query.Condition;
+import com.fnklabs.dds.table.query.Condition;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;

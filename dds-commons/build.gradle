@@ -1,9 +1,11 @@
+apply plugin: "me.champeau.gradle.jmh"
+
 dependencies {
     compile "com.google.guava:guava:$vers.guava"
 
     testCompile "junit:junit:$vers.junit"
     testCompile "org.mockito:mockito-core:$vers.mockito"
-    testCompile "org.openjdk.jmh:jmh-core:$vers.jmh"
-    testCompile "org.openjdk.jmh:jmh-generator-annprocess:$vers.jmh"
+    jmh "org.openjdk.jmh:jmh-core:$vers.jmh"
+    jmh "org.openjdk.jmh:jmh-generator-annprocess:$vers.jmh"
     testCompile "ch.qos.logback:logback-classic:$vers.logback"
 }

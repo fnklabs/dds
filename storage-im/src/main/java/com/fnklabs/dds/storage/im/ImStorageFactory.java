@@ -5,7 +5,6 @@ import com.fnklabs.dds.storage.TableStorage;
 
 public class ImStorageFactory implements StorageFactory<ImStorageOptions> {
 
-
     @Override
     public TableStorage get(ImStorageOptions storageOptions) {
         return new ImTableStorage(storageOptions.maxSize());

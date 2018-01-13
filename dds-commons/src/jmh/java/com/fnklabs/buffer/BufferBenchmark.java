@@ -2,10 +2,16 @@ package com.fnklabs.buffer;
 
 import org.junit.Before;
 import org.openjdk.jmh.annotations.*;
+import org.openjdk.jmh.profile.*;
+import org.openjdk.jmh.runner.Runner;
+import org.openjdk.jmh.runner.RunnerException;
+import org.openjdk.jmh.runner.options.Options;
+import org.openjdk.jmh.runner.options.OptionsBuilder;
+import org.openjdk.jmh.runner.options.VerboseMode;
 
 import java.util.concurrent.TimeUnit;
 
-@Threads(value = 4)
+@Threads(value = 8)
 @Fork(value = 4, jvmArgs = {
         "-server",
         "-Xms512m",
@@ -30,7 +36,20 @@ import java.util.concurrent.TimeUnit;
 @Warmup(iterations = 20, timeUnit = TimeUnit.MILLISECONDS)
 @Measurement(iterations = 20, timeUnit = TimeUnit.MICROSECONDS)
 public class BufferBenchmark {
+    public static void main(String[] args) throws RunnerException {
+        Options opt = new OptionsBuilder()
+                .include(BufferBenchmark.class.getName())
+                .addProfiler(GCProfiler.class)
+                .addProfiler(HotspotMemoryProfiler.class)
+                .addProfiler(HotspotRuntimeProfiler.class)
+                .addProfiler(HotspotThreadProfiler.class)
+                .addProfiler(PausesProfiler.class)
+                .addProfiler(StackProfiler.class)
+                .verbosity(VerboseMode.EXTRA)
+                .build();
 
+        new Runner(opt).run();
+    }
 
     @Benchmark
     public void readDirect(DirectContext context) {
@@ -54,7 +73,7 @@ public class BufferBenchmark {
 
     @Benchmark
     public void scanDirect(DirectContext context) {
-        for (int i = 0; i < context.bufferSize; i += context.bufferSize) {
+        for (int i = 0; i < context.buffer.bufferSize(); i += context.bufferSize) {
             context.buffer.read(0, context.dataBuffer);
         }
     }
@@ -91,7 +110,10 @@ public class BufferBenchmark {
     public static abstract class Context {
         public static final int ALLOCATED_SIZE = 512 * 1024 * 1024;
 
-        @Param({"4", "8", "20", "32", "64", "4096", "65536"})
+        @Param({
+//                "4",
+//                "8", "20", "32", "64", "4096",
+                "65536"})
         int bufferSize;
 
         Buffer buffer;

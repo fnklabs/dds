@@ -1,6 +1,4 @@
 dependencies {
-    compile project(":dds-commons")
-
     compile "org.apache.commons:commons-lang3:$vers.lang3"
     compile "com.google.guava:guava:$vers.guava"
 }
