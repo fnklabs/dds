@@ -32,18 +32,31 @@ abstract class AbstractByteBuffer implements Buffer {
 
         ByteBuffer buffer = this.buffer.duplicate();
         buffer.position((int) position);
-        buffer.get(data);
 
-        return buffer.position() - (int) position;
+        int length = buffer.remaining() > data.length ? data.length : buffer.remaining();
+
+        buffer.get(data, 0, length);
+
+        return length;
     }
 
     @Override
-    public int read(long position, byte[] data, long offset, int length) {
+    public int read(long position, byte[] dstBuffer, long offset, int length) {
         Verify.verify(position < size, "position can't be higher that size %d", size);
 
         ByteBuffer buffer = this.buffer.duplicate();
+
+        Verify.verify(buffer.position() + length < buffer.limit());
+        Verify.verify(
+                dstBuffer.length - offset >= length,
+                "invalid offset parameters for read. offset: %s length: %s data.length = %s",
+                offset,
+                length,
+                dstBuffer.length
+        );
+
         buffer.position((int) position);
-        buffer.get(data, (int) offset, length);
+        buffer.get(dstBuffer, (int) offset, length);
 
         return buffer.position() - (int) position;
     }

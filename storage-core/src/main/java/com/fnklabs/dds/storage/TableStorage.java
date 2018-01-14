@@ -23,12 +23,11 @@ public interface TableStorage {
 
     /**
      * Read data
-     *
-     * @param position position
+     *  @param position position
      * @param data     buffer to which data will be written
      */
-    void read(long position, byte[] data);
+    int read(long position, byte[] data);
 
 
-    void scan(long position, ScanFunction scanFunction, Supplier<byte[]> bufferSupplier);
+    void scan(long position, long end, ScanFunction scanFunction, Supplier<byte[]> bufferSupplier);
 }

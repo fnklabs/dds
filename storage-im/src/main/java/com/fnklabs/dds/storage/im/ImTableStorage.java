@@ -6,104 +6,86 @@ import com.fnklabs.dds.storage.ScanFunction;
 import com.fnklabs.dds.storage.TableStorage;
 import com.google.common.base.Verify;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
 public class ImTableStorage implements TableStorage {
     private final int bufferSize;
     private final long maxSize;
-    private final int chunkSize;
 
-    private final Map<Integer, Buffer> buffers = new ConcurrentHashMap<>();
+    private final Buffer buffer;
 
     private final AtomicLong lastPosition = new AtomicLong();
 
-    ImTableStorage(long maxSize) {
-        this(maxSize, 4 * 1024, 512 * 1024 * 1024);
-    }
+    private final ThreadLocal<byte[]> storageBuffer;
 
-    ImTableStorage(long maxSize, int bufferSize, int chunkSize) {
+
+    ImTableStorage(long maxSize, int bufferSize) {
+
         this.maxSize = maxSize;
         this.bufferSize = bufferSize;
-        this.chunkSize = chunkSize;
+
+
+        this.buffer = BufferType.DIRECT.get(maxSize);
+
+        this.storageBuffer = ThreadLocal.withInitial(() -> new byte[bufferSize]);
     }
 
     @Override
     public long allocatedSize() {
-        return buffers.size() * chunkSize;
+        return buffer.bufferSize();
     }
 
     @Override
     public void write(long position, byte[] data) {
-        int dataOffset = 0;
-
-        while (dataOffset < data.length) {
-            Buffer buff = getBuffer(position + dataOffset);
-
-            int buffOffset = (int) (position % chunkSize);
-
-            int availableSize = (int) (buff.bufferSize() - buffOffset);
-
-            int dataToCopy = data.length < availableSize ? data.length : availableSize;
-
-            buff.write(buffOffset, data, dataOffset, dataToCopy);
-
-            dataOffset += dataToCopy;
-        }
+        buffer.write(position, data);
 
         long currentValue = lastPosition.get();
 
         if (currentValue < position + data.length) {
             lastPosition.compareAndSet(currentValue, position + data.length);
         }
+
     }
 
     @Override
-    public void read(long position, byte[] data) {
-        int dataOffset = 0;
+    public int read(long position, byte[] buffer) {
+        int availableBufferLength = (int) (maxSize - position); // available size for read in current buffer
 
-        while (dataOffset < data.length) {
-            Buffer buff = getBuffer(position + dataOffset);
+        int length = buffer.length < availableBufferLength ? buffer.length : availableBufferLength;
 
-            int buffOffset = (int) (position % chunkSize);
+        this.buffer.read(position, buffer, 0, length);
 
-            int availableSize = (int) (buff.bufferSize() - buffOffset);
-
-            int dataToCopy = data.length < availableSize ? data.length : availableSize;
-
-            buff.read(buffOffset, data, dataOffset, dataToCopy);
-
-            dataOffset += dataToCopy;
-        }
+        return length;
     }
 
+
     @Override
-    public void scan(long position, ScanFunction scanFunction, Supplier<byte[]> bufferSupplier) {
-        byte[] buffer = bufferSupplier.get();
+    public void scan(long position, long end, ScanFunction scanFunction, Supplier<byte[]> bufferSupplier) {
+        Verify.verify(position < end, "end position must be > start position");
 
-        long positionOffset = 0;
+        byte[] storageBuffer = this.storageBuffer.get();
+        byte[] dataBuffer = bufferSupplier.get();
 
-        while (positionOffset < lastPosition.get()) {
-            read(positionOffset, buffer);
+        Verify.verify(storageBuffer.length >= dataBuffer.length, "buffer can't be bigger than storage buffer");
 
-            if (scanFunction.accept(positionOffset, buffer)) {
-                positionOffset += buffer.length;
-                continue;
+        long positionOffset = position;
+
+        while (positionOffset < end) {
+            int readBytes = read(positionOffset, storageBuffer);
+
+
+            for (int i = 0; i < readBytes; i += dataBuffer.length) {
+                System.arraycopy(storageBuffer, i, dataBuffer, 0, dataBuffer.length);
+
+                if (!scanFunction.accept(positionOffset + i, dataBuffer)) {
+                    return;
+                }
             }
 
-            break;
+            int tail = readBytes % dataBuffer.length;
+
+            positionOffset += readBytes - tail;
         }
-    }
-
-    private Buffer getBuffer(long position) {
-        int bufferIndex = (int) (position / chunkSize);
-
-        Verify.verify(bufferIndex * chunkSize < maxSize);
-
-        return buffers.computeIfAbsent(bufferIndex, (k) -> {
-            return BufferType.DIRECT.get(chunkSize);
-        });
     }
 }

@@ -72,6 +72,7 @@ public class ImStorageBenchmarkTest {
     public void scan(ScanContext context, ScanParameters parameters) {
         context.imStorage.scan(
                 0,
+                Context.ALLOCATED_SIZE,
                 (position, data) -> true,
                 () -> parameters.buffer
         );
@@ -84,7 +85,7 @@ public class ImStorageBenchmarkTest {
 
         @Setup
         public void setUp() {
-            imStorage = new ImTableStorage(ALLOCATED_SIZE);
+            imStorage = new ImTableStorage(ALLOCATED_SIZE, 4 * 1_024);
         }
     }
 
@@ -94,8 +95,6 @@ public class ImStorageBenchmarkTest {
         @Setup
         public void setUp() {
             super.setUp();
-
-            imStorage.write(ALLOCATED_SIZE - 2, new byte[1]);
         }
     }
 
@@ -134,7 +133,7 @@ public class ImStorageBenchmarkTest {
 
         @Setup
         public void setUp() {
-            buffer = new byte[64 * 1024];
+            buffer = new byte[64];
         }
     }
 }

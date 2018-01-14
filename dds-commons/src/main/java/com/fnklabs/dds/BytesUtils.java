@@ -17,15 +17,16 @@ public class BytesUtils {
      */
     public static int compare(byte[] left, byte[] right) {
         for (int i = 0; i < left.length; i++) {
-            int leftByte = left[i] & 0xFF;
-            int rightByte = right[i] & 0xFF;
+            byte leftByte = left[i];
+            byte rightByte = right[i];
 
-            if (leftByte > rightByte) {
-                return 1;
-            } else if (leftByte < rightByte) {
-                return -1;
+            int compareResult = Byte.compare(leftByte, rightByte);
+
+            if (compareResult != 0) {
+                return compareResult;
             }
         }
+
         return 0;
     }
 

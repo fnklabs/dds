@@ -7,6 +7,6 @@ public class ImStorageFactory implements StorageFactory<ImStorageOptions> {
 
     @Override
     public TableStorage get(ImStorageOptions storageOptions) {
-        return new ImTableStorage(storageOptions.maxSize());
+        return new ImTableStorage(storageOptions.maxSize(), storageOptions.bufferSize());
     }
 }

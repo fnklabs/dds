@@ -1,11 +1,15 @@
 package com.fnklabs.dds.storage.im;
 
+import com.fnklabs.dds.storage.ScanFunction;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.BitSet;
+
 public class ImTableStorageTest {
 
+    public static final int MAX_SIZE = 128 * 1024 * 1024; // 128 MB
     private ImTableStorage imStorage;
 
     private byte[] data;
@@ -14,12 +18,11 @@ public class ImTableStorageTest {
 
     @Before
     public void setUp() throws Exception {
-        imStorage = new ImTableStorage(64 * 1024 * 1024, 128, 8 * 1024 * 1024); // 64 MB
+        imStorage = new ImTableStorage(MAX_SIZE, 128); // 8 MB
 
         data = new byte[]{
                 0, 0, 0, 0, 0, 0, 0, 1,
                 0, 0, 0, 0, 0, 0, 0, 2,
-                0, 0, 0, 3,
         };
 
         buffer = new byte[data.length];
@@ -52,18 +55,37 @@ public class ImTableStorageTest {
         Assert.assertArrayEquals(new byte[4], intData);
     }
 
+
     @Test
     public void scan() {
 
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < MAX_SIZE / data.length; i++) {
             imStorage.write(i * data.length, data);
         }
 
-        for (int i = 0; i < 10; i++) {
-            imStorage.read(i * data.length, buffer);
+        imStorage.scan(
+                0,
+                MAX_SIZE,
+                new ScanFunction() {
+                    @Override
+                    public boolean accept(long position, byte[] data) {
+                        String msg = String.format(
+                                "error on %d expected %s actual %s",
+                                position,
+                                BitSet.valueOf(ImTableStorageTest.this.data).toString(),
+                                BitSet.valueOf(data).toString()
+                        );
 
-            Assert.assertArrayEquals(data, buffer);
-        }
+                        Assert.assertEquals(ImTableStorageTest.this.data.length, data.length);
+                        Assert.assertArrayEquals(msg, ImTableStorageTest.this.data, data);
+
+                        return true;
+                    }
+                },
+                () -> new byte[data.length]
+        );
+
+
     }
 
 
