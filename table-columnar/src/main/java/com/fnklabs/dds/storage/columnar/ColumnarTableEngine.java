@@ -1,33 +1,35 @@
 package com.fnklabs.dds.storage.columnar;
 
 import com.fnklabs.dds.storage.TableStorage;
-import com.fnklabs.dds.table.ResultSet;
-import com.fnklabs.dds.table.TableDefinition;
-import com.fnklabs.dds.table.TableEngine;
-import com.fnklabs.dds.table.query.Query;
+import com.fnklabs.dds.table.*;
+import com.google.common.base.Verify;
 import com.google.common.collect.Range;
 import com.google.common.hash.HashFunction;
 import com.google.common.hash.Hashing;
+import com.google.protobuf.ByteString;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class ColumnarTableEngine implements TableEngine {
+class ColumnarTableEngine implements TableEngine {
     private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(ColumnarTableEngine.class);
 
     private final TableDefinition tableDefinition;
 
     private final Map<Range<Long>, ColumnarChunk> chunks = new ConcurrentHashMap<>();
 
-    private final HashFunction hashFunction = Hashing.murmur3_128();
+    private final ColumnDefinition primary;
+
+    private final HashFunction hashFunction = Hashing.murmur3_32();
 
     private final int vNodes;
     private final long chunkSize;
     private final TableStorage tableStorage;
 
-    public ColumnarTableEngine(TableDefinition tableDefinition, TableStorage storage, int vNodes, long chunkSize) {
+    ColumnarTableEngine(TableDefinition tableDefinition, TableStorage storage, int vNodes, long chunkSize) {
         this.tableDefinition = tableDefinition;
         this.tableStorage = storage;
         this.vNodes = vNodes;
@@ -55,12 +57,37 @@ public class ColumnarTableEngine implements TableEngine {
             from = to;
         }
 
-        LOGGER.debug("Chunks for table `{}`: {}", tableDefinition.name(), chunks);
+        primary = tableDefinition.getColumnList()
+                                 .stream()
+                                 .filter(ColumnDefinition::getPrimary)
+                                 .findFirst()
+                                 .orElse(null);
+
+        LOGGER.debug("Chunks for table `{}`: {}", tableDefinition.getName(), chunks);
     }
 
 
     @Override
-    public ResultSet query(Query query) {
+    public ResultSet query(Insert insert) {
+        String table = insert.getTable();
+
+        Verify.verify(StringUtils.isNoneEmpty(table), "table name can't be empty");
+
+        Map<String, ByteString> valueMap = insert.getValueMap();
+
+        String primaryColumnName = primary.getName();
+
+        Verify.verify(insert.containsValue(primaryColumnName), "primary key doesn't exists");
+
+        byte[] primaryKeyValue = valueMap.get(primaryColumnName).toByteArray();
+
+        ColumnarChunk chunkForKey = getChunkForKey(primaryKeyValue);
+
+        return chunkForKey.query(insert);
+    }
+
+    @Override
+    public ResultSet query(Select select) {
         return null;
     }
 

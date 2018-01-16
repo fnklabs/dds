@@ -74,6 +74,9 @@ public class ImTableStorage implements TableStorage {
         while (positionOffset < end) {
             int readBytes = read(positionOffset, storageBuffer);
 
+            if (end - positionOffset < readBytes) {
+                readBytes = (int) (end - positionOffset);
+            }
 
             for (int i = 0; i < readBytes; i += dataBuffer.length) {
                 System.arraycopy(storageBuffer, i, dataBuffer, 0, dataBuffer.length);

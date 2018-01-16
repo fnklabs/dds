@@ -6,10 +6,10 @@ import com.google.common.base.Verify;
 import java.util.HashMap;
 import java.util.Map;
 
-public final class CodeсFactory {
+public final class CodecRegistry {
     private final static Map<DataType, DataTypeCodec> codecs = new HashMap<>();
 
-    private CodeсFactory() {
+    static {
         codecs.put(DataType.BOOLEAN, new BooleanCode());
         codecs.put(DataType.BYTE, new ByteCodec());
         codecs.put(DataType.INT, new IntCodec());
@@ -19,7 +19,9 @@ public final class CodeсFactory {
         codecs.put(DataType.STRING, new StringCodec());
     }
 
-    public static DataTypeCodec codec(DataType dataType) {
+    private CodecRegistry() {}
+
+    public static DataTypeCodec get(DataType dataType) {
         DataTypeCodec codec = codecs.get(dataType);
 
         Verify.verifyNotNull(codec, "codec not found");

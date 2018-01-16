@@ -1,7 +1,6 @@
 package com.fnklabs.dds.table;
 
 import com.fnklabs.dds.storage.TableStorage;
-import com.fnklabs.dds.table.query.Query;
 
 public final class TableImpl implements Table {
     private final TableDefinition tableDefinition;
@@ -19,7 +18,7 @@ public final class TableImpl implements Table {
 
     @Override
     public String name() {
-        return tableDefinition.name();
+        return tableDefinition.getName();
     }
 
     @Override
@@ -28,9 +27,12 @@ public final class TableImpl implements Table {
     }
 
     @Override
-    public ResultSet query(Query query) {
-        return tableEngine.query(query);
+    public ResultSet query(Insert insertQuery) {
+        return tableEngine.query(insertQuery);
     }
 
-
+    @Override
+    public ResultSet query(Select selectQuery) {
+        return tableEngine.query(selectQuery);
+    }
 }

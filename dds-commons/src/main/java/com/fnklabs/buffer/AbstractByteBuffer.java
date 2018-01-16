@@ -63,7 +63,7 @@ abstract class AbstractByteBuffer implements Buffer {
 
     @Override
     public void write(long position, byte[] data) {
-        Verify.verify(position < size, "position can't be higher that size: %d", size);
+        Verify.verify(position < size, "position %s can't be higher that size: %ы", position, size);
 
         ByteBuffer duplicate = buffer.duplicate();
 
@@ -76,7 +76,7 @@ abstract class AbstractByteBuffer implements Buffer {
 
     @Override
     public void write(long position, byte[] data, long offset, int length) {
-        Verify.verify(position < size, "position can't be higher that size: %d", size);
+        Verify.verify(position < size, "position %s can't be higher that size: %ы", position, size);
 
         ByteBuffer duplicate = buffer.duplicate();
 

@@ -1,6 +1,8 @@
 dependencies {
     compile project(":dds-commons")
     compile project(":dds-table-core")
+    compile project(":dds-storage-im")
+
 
     compile "com.fnklabs:fnklabs-metrics-core:$vers.metrics"
     compile "com.fnklabs:fnklabs-metrics-codahale:$vers.metrics"
