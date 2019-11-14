@@ -27,7 +27,7 @@ abstract class AbstractByteBuffer implements Buffer {
     }
 
     @Override
-    public int read(long position, byte[] data) {
+    public void read(long position, byte[] data) {
         Verify.verify(position < size, "position can't be higher that size %d", size);
 
         ByteBuffer buffer = this.buffer.duplicate();
@@ -36,12 +36,10 @@ abstract class AbstractByteBuffer implements Buffer {
         int length = buffer.remaining() > data.length ? data.length : buffer.remaining();
 
         buffer.get(data, 0, length);
-
-        return length;
     }
 
     @Override
-    public int read(long position, byte[] dstBuffer, long offset, int length) {
+    public void read(long position, byte[] dstBuffer, int offset, int length) {
         Verify.verify(position < size, "position can't be higher that size %d", size);
 
         ByteBuffer buffer = this.buffer.duplicate();
@@ -57,8 +55,6 @@ abstract class AbstractByteBuffer implements Buffer {
 
         buffer.position((int) position);
         buffer.get(dstBuffer, (int) offset, length);
-
-        return buffer.position() - (int) position;
     }
 
     @Override
@@ -75,7 +71,7 @@ abstract class AbstractByteBuffer implements Buffer {
     }
 
     @Override
-    public void write(long position, byte[] data, long offset, int length) {
+    public void write(long position, byte[] data, int offset, int length) {
         Verify.verify(position < size, "position %s can't be higher that size: %ы", position, size);
 
         ByteBuffer duplicate = buffer.duplicate();

@@ -9,9 +9,9 @@ import com.fnklabs.metrics.Timer;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
 import java.util.Queue;
@@ -22,9 +22,10 @@ import java.util.function.BiConsumer;
  * Worker for processing new messages from Connector queue
  * Retrieve new messages from {@link #messagesQueue} queue and consume them to {@link #incomeMessageHandler} consumer
  */
-@Slf4j
-@RequiredArgsConstructor
+
 class NetworkServerWorker implements Runnable {
+
+    private final static Logger log = LoggerFactory.getLogger(NetworkServerWorker.class);
 
     /**
      * New request queue
@@ -43,6 +44,13 @@ class NetworkServerWorker implements Runnable {
      * Response consumer
      */
     private final BiConsumer<Long, ReplyMessage> responseConsumer;
+
+    NetworkServerWorker(Queue<RequestMessage> messagesQueue, AtomicBoolean isRunning, IncomeMessageHandler incomeMessageHandler, BiConsumer<Long, ReplyMessage> responseConsumer) {
+        this.messagesQueue = messagesQueue;
+        this.isRunning = isRunning;
+        this.incomeMessageHandler = incomeMessageHandler;
+        this.responseConsumer = responseConsumer;
+    }
 
 
     @Override

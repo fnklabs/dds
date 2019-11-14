@@ -10,17 +10,20 @@ import com.fnklabs.metrics.MetricsFactory;
 import com.fnklabs.metrics.Timer;
 import com.google.common.net.HostAndPort;
 import com.google.common.util.concurrent.Futures;
-import lombok.extern.slf4j.Slf4j;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
 import java.util.stream.IntStream;
 
-@Slf4j
+
 public class NetworkServerTest {
+    private final static Logger log = LoggerFactory.getLogger(NetworkServerTest.class);
+
     private NetworkServer networkServer;
 
     private NetworkExecutor serverExecutor;

@@ -4,7 +4,6 @@ import com.fnklabs.dds.IOUtils;
 import com.fnklabs.metrics.MetricsFactory;
 import com.fnklabs.metrics.Timer;
 import com.google.common.collect.Sets;
-import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.LoggerFactory;
 
@@ -275,10 +274,13 @@ public class FileDataStorage implements DataStorage {
         IOUtils.write(channel, byteBuffer, 0);
     }
 
-    @RequiredArgsConstructor
     private static class DataBlockEntry {
         private final long position;
         private final DataBlock dataBlock;
 
+        private DataBlockEntry(long position, DataBlock dataBlock) {
+            this.position = position;
+            this.dataBlock = dataBlock;
+        }
     }
 }

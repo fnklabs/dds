@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit;
 @Fork(value = 4, jvmArgs = {
         "-server",
         "-Xms512m",
-        "-Xmx4G",
+        "-Xmx6G",
         "-XX:NewSize=512m",
         "-XX:SurvivorRatio=6",
         "-XX:+AlwaysPreTouch",
@@ -41,8 +41,8 @@ import java.util.concurrent.TimeUnit;
         "-XX:+UseLargePages",
         "-XX:+UseCompressedOops"
 })
-@Warmup(iterations = 10, timeUnit = TimeUnit.MILLISECONDS)
-@Measurement(iterations = 10, timeUnit = TimeUnit.MICROSECONDS)
+@Warmup(iterations = 5, timeUnit = TimeUnit.MILLISECONDS)
+@Measurement(iterations = 5, timeUnit = TimeUnit.MICROSECONDS)
 public class ColumnarChunkBenchmark {
     public static void main(String[] args) throws RunnerException {
         Options opt = new OptionsBuilder()
@@ -81,7 +81,7 @@ public class ColumnarChunkBenchmark {
 
     @State(Scope.Benchmark)
     public abstract static class Context {
-        public static final int ALLOCATED_SIZE = 64 * 1024 * 1024;
+        public static final int ALLOCATED_SIZE = 512 * 1024 * 1024;
         protected ByteBuffer idBuffer;
         protected ByteBuffer field1Buffer;
         protected ByteBuffer field2Buffer;

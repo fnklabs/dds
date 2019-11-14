@@ -4,7 +4,7 @@ public interface Buffer {
 
     long bufferSize();
 
-    int read(long position, byte[] data);
+    void read(long position, byte[] data);
 
     /**
      * @param position buffer position
@@ -14,9 +14,9 @@ public interface Buffer {
      *
      * @return
      */
-    int read(long position, byte[] data, long offset, int length);
+    void read(long position, byte[] data, int offset, int length);
 
     void write(long position, byte[] data);
 
-    void write(long position, byte[] data, long offset, int length);
+    void write(long position, byte[] data, int offset, int length);
 }

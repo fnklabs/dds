@@ -1,8 +1,6 @@
 package com.fnklabs.dds.storage;
 
 import com.fnklabs.dds.IOUtils;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 
 import java.nio.ByteBuffer;
 
@@ -11,18 +9,18 @@ import java.nio.ByteBuffer;
  * <pre>
  *
  * Block length | Version |Next block position | Key |Data
- Type
- int
- int
- long
- byte[]
- byte[]
- Offset
- 0
- 4
- 8
- 16
- 16 + key.length
+ * Type
+ * int
+ * int
+ * long
+ * byte[]
+ * byte[]
+ * Offset
+ * 0
+ * 4
+ * 8
+ * 16
+ * 16 + key.length
  * </pre>
  * <p>
  * <p>
@@ -31,15 +29,23 @@ import java.nio.ByteBuffer;
  * | MetaInformation | Data Block[0] |...| Data Block[n]
  */
 
-@Getter
 public class DataBlock {
     private final Header header;
     private final byte[] key;
     private final byte[] data;
 
-//    public DataBlock(byte[] key, byte[] value) {
-//
-//    }
+
+    public Header getHeader() {
+        return header;
+    }
+
+    public byte[] getKey() {
+        return key;
+    }
+
+    public byte[] getData() {
+        return data;
+    }
 
     DataBlock(byte[] key, byte[] data, long nextBlockPosition, int version) {
         int blockLength = Header.HEADER_SIZE + key.length + data.length;
@@ -84,8 +90,6 @@ public class DataBlock {
         return DataBlock.Header.HEADER_SIZE + dataKey.length + data.length;
     }
 
-    @RequiredArgsConstructor
-    @Getter
     static class Header {
         static final int HEADER_SIZE = Integer.BYTES + Integer.BYTES + Long.BYTES;
 
@@ -95,6 +99,24 @@ public class DataBlock {
         private final int version;
         /** pointer on next block */
         private final long nextBlockPosition;
+
+        public int getLength() {
+            return length;
+        }
+
+        public int getVersion() {
+            return version;
+        }
+
+        public long getNextBlockPosition() {
+            return nextBlockPosition;
+        }
+
+        Header(int length, int version, long nextBlockPosition) {
+            this.length = length;
+            this.version = version;
+            this.nextBlockPosition = nextBlockPosition;
+        }
 
         public static ByteBuffer pack(Header header) {
             int length = header.length;

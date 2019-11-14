@@ -16,7 +16,7 @@ public class HeapBufferTest {
 
     @Test
     public void read() {
-        int read = buffer.read(0, dataBuffer);
+        buffer.read(0, dataBuffer);
         buffer.read(0, dataBuffer);
     }
 

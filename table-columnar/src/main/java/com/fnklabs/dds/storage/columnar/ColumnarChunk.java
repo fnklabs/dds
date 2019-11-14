@@ -1,9 +1,17 @@
 package com.fnklabs.dds.storage.columnar;
 
 import com.fnklabs.dds.storage.TableStorage;
-import com.fnklabs.dds.table.*;
-import com.fnklabs.dds.table.codec.CodecRegistry;
-import com.fnklabs.dds.table.codec.DataTypeCodec;
+import com.fnklabs.dds.table.AggregationFunction;
+import com.fnklabs.dds.table.Clause;
+import com.fnklabs.dds.table.ColumnDefinition;
+import com.fnklabs.dds.table.Expression;
+import com.fnklabs.dds.table.Insert;
+import com.fnklabs.dds.table.ResultSet;
+import com.fnklabs.dds.table.Row;
+import com.fnklabs.dds.table.Select;
+import com.fnklabs.dds.table.Selection;
+import com.fnklabs.dds.table.TableDefinition;
+import com.fnklabs.dds.table.TableEngine;
 import com.fnklabs.dds.table.expression.EvaluatorFactory;
 import com.fnklabs.dds.table.expression.ExpressionEvaluator;
 import com.fnklabs.metrics.Counter;
@@ -15,7 +23,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -40,13 +52,15 @@ class ColumnarChunk implements TableEngine {
     //    private final Counter sizeCounter;
     private final Counter itemsCounter;
 
+    private final long maxItems;
+
     private final int primaryKeySize;
     private final int rowSize;
-    private final long maxSize;
+
+    private final ThreadLocal<Collection<Long>> resultBuffer;
 
     ColumnarChunk(int id, long maxSize, TableDefinition tableDefinition, TableStorage storage, Range<Long> tokenRange) {
         this.id = id;
-        this.maxSize = maxSize;
         this.tableDefinition = tableDefinition;
         this.storage = storage;
         this.tokenRange = tokenRange;
@@ -66,6 +80,8 @@ class ColumnarChunk implements TableEngine {
 
         long offset = 0;
 
+        long maxItems = maxSize / rowSize;
+
         LOGGER.debug("row size {}/{}", primaryKeySize, rowSize);
 
 
@@ -83,18 +99,28 @@ class ColumnarChunk implements TableEngine {
 
             columnStatistic.put(columnDefinition, new Statistic(maxSize / rowSize, 0.01f, columnBlockSize, beginPosition, endPosition));
             columns.put(columnDefinition.getName(), columnDefinition);
+
+            long columnMaxItems = requiredColumnBlockSize / columnBlockSize;
+
+            if (columnMaxItems < maxItems) {
+                maxItems = columnMaxItems;
+            }
         }
+
+        this.maxItems = maxItems;
+        this.resultBuffer = ThreadLocal.withInitial(() -> new HashSet<Long>((int) this.maxItems));
 
         LOGGER.debug("columns: {} blocks: {}", tableDefinition.getColumnList(), offset);
 
 
-//        sizeCounter = MetricsFactory.getMetrics().getCounter(String.format("chunk.%s-%d.size", tableDefinition.getName(), id));
         itemsCounter = MetricsFactory.getMetrics().getCounter(String.format("chunk.%s-%d.items", tableDefinition.getName(), id));
     }
 
     @Override
     public ResultSet query(Insert insert) {
         long currentItems = items.getAndIncrement();
+
+        Verify.verify(currentItems < maxItems, "overflow");
 
         itemsCounter.inc();
 
@@ -105,10 +131,6 @@ class ColumnarChunk implements TableEngine {
                 Statistic columnStatistic = this.columnStatistic.get(columnDefinition);
 
                 long position = columnStatistic.startPosition() + currentItems * columnStatistic.getSize();
-
-                long endPosition = position + columnStatistic.getSize();
-
-                Verify.verify(columnStatistic.getRange().contains(endPosition)); // verify limits
 
                 ByteString value = insert.getValueOrThrow(columnDefinition.getName());
 
@@ -125,107 +147,89 @@ class ColumnarChunk implements TableEngine {
     @Override
     public ResultSet query(Select select) {
 
+        Collection<Long> filteredResult = resultBuffer.get();
 
-        if (select.getWhere().getClausesCount() == 0) {
-            ResultSet.Builder resultSetBuilder = ResultSet.newBuilder();
-
-            for (Selection selection : select.getSelectionList()) {
-                AggregationFunction aggregateFunction = selection.getAggregateFunction();
-
-                if (aggregateFunction == AggregationFunction.COUNT) {
-                    DataTypeCodec codec = CodecRegistry.get(DataType.LONG);
-
-                    ByteBuffer buffer = ByteBuffer.allocate(codec.size());
-                    codec.encode(items.get(), buffer);
-
-                    Row row = Row.newBuilder().putValue("count", ByteString.copyFrom(buffer.array())).build();
-
-                    resultSetBuilder.addResult(row);
-                }
-            }
-
-            return resultSetBuilder.build();
+        if (select.getWhere().getClausesList().size() == 0) {
+//        todo    fullScan(primaryColumnDefinition, EvaluatorFactory.get(Expression.N) filteredResult);
 
         } else {
-            Collection<Long> filteredResult = new ArrayList<>();
-
             for (Clause clause : select.getWhere().getClausesList()) {
                 ColumnDefinition column = columns.get(clause.getColumn());
 
-                Collection<Long> filter = filter(column, clause.getExpression(), clause.getValue().toByteArray(), filteredResult);
+                filter(column, clause.getExpression(), clause.getValue().toByteArray(), filteredResult);
 
-                filteredResult.clear();
-                filteredResult.addAll(filter);
-
-                if (filter.isEmpty()) {
+                if (filteredResult.isEmpty()) {
                     break; // no data
                 }
             }
-
-            ResultSet.Builder resultSetBuilder = ResultSet.newBuilder();
-
-            for (Selection selection : select.getSelectionList()) {
-                AggregationFunction aggregateFunction = selection.getAggregateFunction();
-
-                if (aggregateFunction == AggregationFunction.COUNT) {
-                    ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
-                    buffer.putLong(filteredResult.size());
-
-                    Row row = Row.newBuilder().putValue("count", ByteString.copyFrom(buffer.array())).build();
-
-                    resultSetBuilder.addResult(row);
-                }
-            }
-
-            return resultSetBuilder.build();
         }
+
+        ResultSet.Builder resultSetBuilder = ResultSet.newBuilder();
+
+        for (Selection selection : select.getSelectionList()) {
+            AggregationFunction aggregateFunction = selection.getAggregateFunction();
+
+            if (aggregateFunction == AggregationFunction.COUNT) {
+                ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
+                buffer.putLong(filteredResult.size());
+
+                Row row = Row.newBuilder().putValue("count", ByteString.copyFrom(buffer.array())).build();
+
+                resultSetBuilder.addResult(row);
+            }
+        }
+
+        filteredResult.clear();
+
+        return resultSetBuilder.build();
+//        }
     }
 
-    private Collection<Long> filter(ColumnDefinition columnDefinition, Expression expression, byte[] value, Collection<Long> filteredResult) {
+    private void fullScan(ColumnDefinition columnDefinition, ExpressionEvaluator expressionEvaluator, byte[] value, Collection<Long> result) {
+        Statistic statistic = columnStatistic.get(columnDefinition);
+
+        long from = statistic.startPosition();
+        long to = from + statistic.getSize() * items.get(); // last written position to avoid null scan
+
+        AtomicLong itemIndex = new AtomicLong();
+
+        storage.scan(from, to,
+                     (position, data) -> {
+                         long index = itemIndex.getAndIncrement();
+
+                         if (expressionEvaluator.evaluate(data, value)) {
+                             result.add(index);
+                         }
+
+                         return true;
+                     },
+                     () -> new byte[statistic.getSize()]
+        );
+    }
+
+    private void filter(ColumnDefinition columnDefinition, Expression expression, byte[] value, Collection<Long> filteredResult) {
         Statistic statistic = columnStatistic.get(columnDefinition);
 
         if (!statistic.match(expression, value)) {
-            return Collections.emptyList();
+            return;
         }
 
-        Collection<Long> mergedResult = new ArrayList<>();
+        byte[] buffer = new byte[columnDefinition.getSize()];
 
-        if (filteredResult.isEmpty()) {
-            long from = statistic.startPosition();
-            long to = from + statistic.getSize() * items.get(); // last written position to avoid null scan
+        ExpressionEvaluator expressionEvaluator = EvaluatorFactory.get(expression);
 
-            ExpressionEvaluator expressionEvaluator = EvaluatorFactory.get(expression);
+        Iterator<Long> iterator = filteredResult.iterator();
 
-            AtomicLong itemIndex = new AtomicLong();
+        while (iterator.hasNext()) {
+            Long itemIndex = iterator.next();
 
-            storage.scan(from, to,
-                         (position, data) -> {
-                             long index = itemIndex.getAndIncrement();
+            long position = statistic.startPosition() + itemIndex * statistic.getSize();
 
-                             if (expressionEvaluator.evaluate(value, data)) {
-                                 mergedResult.add(index);
-                             }
+            storage.read(position, buffer);
 
-                             return true;
-                         },
-                         () -> new byte[statistic.getSize()]
-            );
-        } else {
-            byte[] buffer = new byte[statistic.getSize()];
-
-            ExpressionEvaluator expressionEvaluator = EvaluatorFactory.get(expression);
-
-            for (Long itemIndex : filteredResult) {
-                long position = statistic.startPosition() + itemIndex * statistic.getSize();
-
-                storage.read(position, buffer);
-
-                if (expressionEvaluator.evaluate(value, buffer)) {
-                    mergedResult.add(itemIndex);
-                }
+            if (!expressionEvaluator.evaluate(value, buffer)) {
+                filteredResult.remove(itemIndex);
             }
         }
-
-        return mergedResult;
     }
 }

@@ -4,7 +4,6 @@ dependencies {
 
     compile "com.google.protobuf:protobuf-java:3.5.0"
 
-    compile "org.projectlombok:lombok:$vers.lombok"
     compile "org.apache.commons:commons-lang3:$vers.lang3"
     compile "com.google.guava:guava:$vers.guava"
 }

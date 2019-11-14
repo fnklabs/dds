@@ -14,7 +14,12 @@ public enum BufferType {
         Verify.verify(size <= Integer.MAX_VALUE, "size can't be higher that %d bytes", Integer.MAX_VALUE);
 
         return new DirectBuffer(size.intValue());
-    }),;
+    }),
+
+    UNSAFE((size) -> {
+        return new UnsafeBuffer(size);
+    });
+
     private final Function<Long, Buffer> bufferSupplier;
 
     BufferType(Function<Long, Buffer> bufferSupplier) {this.bufferSupplier = bufferSupplier;}

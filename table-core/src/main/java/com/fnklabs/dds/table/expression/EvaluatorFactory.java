@@ -8,7 +8,6 @@ import java.util.Map;
 public final class EvaluatorFactory {
     private final static Map<Expression, ExpressionEvaluator> EVALUATORS = new HashMap<>();
 
-
     static {
         EVALUATORS.put(Expression.NEQ, new NeqExpression());
         EVALUATORS.put(Expression.EQ, new EqExpression());

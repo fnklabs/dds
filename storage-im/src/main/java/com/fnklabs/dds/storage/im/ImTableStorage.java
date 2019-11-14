@@ -26,7 +26,7 @@ public class ImTableStorage implements TableStorage {
         this.bufferSize = bufferSize;
 
 
-        this.buffer = BufferType.DIRECT.get(maxSize);
+        this.buffer = BufferType.UNSAFE.get(maxSize);
 
         this.storageBuffer = ThreadLocal.withInitial(() -> new byte[bufferSize]);
     }

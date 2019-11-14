@@ -3,13 +3,15 @@ package com.fnklabs.dds.network.client;
 import com.fnklabs.dds.network.RemoteHostIsNotAvailable;
 import com.fnklabs.dds.network.ReplyMessage;
 import com.google.common.net.HostAndPort;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.function.Consumer;
 
-@Slf4j
+
 public class NetworkClientFactory {
+    private final static Logger log = LoggerFactory.getLogger(NetworkClientFactory.class);
 
     /**
      * Build new network client

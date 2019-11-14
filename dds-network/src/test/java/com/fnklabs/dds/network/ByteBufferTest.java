@@ -1,12 +1,15 @@
 package com.fnklabs.dds.network;
 
-import lombok.extern.slf4j.Slf4j;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
 
-@Slf4j
+
 public class ByteBufferTest {
+    private final static Logger log = LoggerFactory.getLogger(ByteBufferTest.class);
+
     @Test
     public void compact() throws Exception {
         ByteBuffer buffer = ByteBuffer.allocate(3);
@@ -28,7 +31,7 @@ public class ByteBufferTest {
 
         log.debug("Buffer: {}/{}", buffer.array(), buffer);
 
-        buffer.put((byte)4);
+        buffer.put((byte) 4);
 
         log.debug("Buffer: {}/{}", buffer.array(), buffer);
     }

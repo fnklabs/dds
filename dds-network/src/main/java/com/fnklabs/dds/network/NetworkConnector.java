@@ -4,11 +4,16 @@ import com.fnklabs.metrics.Metrics;
 import com.fnklabs.metrics.MetricsFactory;
 import com.fnklabs.metrics.Timer;
 import com.google.common.base.Verify;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.*;
+import java.nio.channels.ClosedChannelException;
+import java.nio.channels.SelectableChannel;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.nio.channels.SocketChannel;
 import java.nio.channels.spi.AbstractSelectableChannel;
 import java.util.Collections;
 import java.util.Queue;
@@ -16,8 +21,9 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 
-@Slf4j
 public abstract class NetworkConnector<T extends Message> {
+    private final static Logger log = LoggerFactory.getLogger(NetworkConnector.class);
+
     private static final Metrics METRICS = MetricsFactory.getMetrics();
     private final Selector selector = Selector.open();
 

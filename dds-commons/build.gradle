@@ -2,6 +2,7 @@ apply plugin: "me.champeau.gradle.jmh"
 
 dependencies {
     compile "com.google.guava:guava:$vers.guava"
+    compile "com.alexkasko.unsafe:unsafe-tools:1.4.4"
 
     testCompile "junit:junit:$vers.junit"
     testCompile "org.mockito:mockito-core:$vers.mockito"

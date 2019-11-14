@@ -1,14 +1,21 @@
 package com.fnklabs.dds.network.client;
 
 import com.fnklabs.concurrent.Executors;
-import com.fnklabs.dds.network.*;
+import com.fnklabs.dds.network.ApiVersion;
+import com.fnklabs.dds.network.ChannelClosedException;
+import com.fnklabs.dds.network.Message;
+import com.fnklabs.dds.network.ReplyMessage;
+import com.fnklabs.dds.network.RequestException;
+import com.fnklabs.dds.network.RequestMessage;
+import com.fnklabs.dds.network.ResponseFuture;
 import com.fnklabs.dds.network.pool.NetworkExecutor;
 import com.fnklabs.metrics.MetricsFactory;
 import com.fnklabs.metrics.Timer;
 import com.google.common.net.HostAndPort;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -19,17 +26,19 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.Map;
 import java.util.Queue;
-import java.util.concurrent.*;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
-import static com.fnklabs.dds.network.NetworkConnector.closeChannel;
-import static com.fnklabs.dds.network.NetworkConnector.readFromChannel;
-import static com.fnklabs.dds.network.NetworkConnector.write;
+import static com.fnklabs.dds.network.NetworkConnector.*;
 
-@Slf4j
+
 public class NetworkClient implements Closeable {
-
+    private final static Logger log = LoggerFactory.getLogger(NetworkClient.class);
     /**
      * Is client running
      */

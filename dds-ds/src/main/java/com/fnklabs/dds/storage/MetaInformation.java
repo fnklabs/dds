@@ -1,20 +1,11 @@
 package com.fnklabs.dds.storage;
 
 import com.fnklabs.dds.DdsVersion;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import lombok.ToString;
 
 import java.nio.ByteBuffer;
+import java.util.Objects;
 import java.util.UUID;
 
-@RequiredArgsConstructor
-@EqualsAndHashCode(of = {
-        "ddsVersion", "version", "keyLength", "positionOfFirstDataBlock", "positionOfFreeDataBlock"
-})
-@ToString
-@Getter
 class MetaInformation {
     /**
      * | DDS_VERSION (4 bytes) | UUID (8 bytes) | Key length (4 bytes) | First block position (Long) | Last block position (long)
@@ -26,6 +17,51 @@ class MetaInformation {
     private final int keyLength;
     private final long positionOfFirstDataBlock;
     private final long positionOfFreeDataBlock;
+
+    public MetaInformation(DdsVersion ddsVersion, UUID version, int keyLength, long positionOfFirstDataBlock, long positionOfFreeDataBlock) {
+        this.ddsVersion = ddsVersion;
+        this.version = version;
+        this.keyLength = keyLength;
+        this.positionOfFirstDataBlock = positionOfFirstDataBlock;
+        this.positionOfFreeDataBlock = positionOfFreeDataBlock;
+    }
+
+    public DdsVersion getDdsVersion() {
+        return ddsVersion;
+    }
+
+    public UUID getVersion() {
+        return version;
+    }
+
+    public int getKeyLength() {
+        return keyLength;
+    }
+
+    public long getPositionOfFirstDataBlock() {
+        return positionOfFirstDataBlock;
+    }
+
+    public long getPositionOfFreeDataBlock() {
+        return positionOfFreeDataBlock;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof MetaInformation)) return false;
+        MetaInformation that = (MetaInformation) o;
+        return keyLength == that.keyLength &&
+                positionOfFirstDataBlock == that.positionOfFirstDataBlock &&
+                positionOfFreeDataBlock == that.positionOfFreeDataBlock &&
+                ddsVersion == that.ddsVersion &&
+                Objects.equals(version, that.version);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(ddsVersion, version, keyLength, positionOfFirstDataBlock, positionOfFreeDataBlock);
+    }
 
     static MetaInformation unpack(ByteBuffer buffer) {
         return new MetaInformation(

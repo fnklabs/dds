@@ -1,6 +1,4 @@
 dependencies {
-    compile "org.projectlombok:lombok:$vers.lombok"
-
     compile "ch.qos.logback:logback-core:$vers.logback"
     compile "ch.qos.logback:logback-classic:$vers.logback"
 

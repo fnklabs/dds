@@ -2,8 +2,6 @@ dependencies {
     compile project(":dds-core")
     compile project(":dds-commons")
 
-    compile "org.projectlombok:lombok:$vers.lombok"
-
     compile "org.slf4j:slf4j-api:$vers.slf4j"
     compile "ch.qos.logback:logback-classic:$vers.logback"
 

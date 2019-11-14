@@ -1,7 +1,8 @@
 package com.fnklabs.dds.network.pool;
 
 import com.fnklabs.concurrent.Executors;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.channels.Channel;
@@ -19,8 +20,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 
-@Slf4j
 public class NioExecutor implements NetworkExecutor {
+    private final static Logger log = LoggerFactory.getLogger(NioExecutor.class);
 
     private final ExecutorService opAcceptExecutor;
     private final ExecutorService opReadExecutor;

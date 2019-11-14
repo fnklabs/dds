@@ -1,8 +1,7 @@
 package com.fnklabs.buffer;
 
-import org.junit.Before;
+import com.google.common.base.Verify;
 import org.openjdk.jmh.annotations.*;
-import org.openjdk.jmh.profile.*;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
@@ -33,18 +32,12 @@ import java.util.concurrent.TimeUnit;
         "-XX:+UseLargePages",
         "-XX:+UseCompressedOops"
 })
-@Warmup(iterations = 20, timeUnit = TimeUnit.MILLISECONDS)
-@Measurement(iterations = 20, timeUnit = TimeUnit.MICROSECONDS)
+@Warmup(iterations = 10, timeUnit = TimeUnit.MILLISECONDS)
+@Measurement(iterations = 10, timeUnit = TimeUnit.MICROSECONDS)
 public class BufferBenchmark {
     public static void main(String[] args) throws RunnerException {
         Options opt = new OptionsBuilder()
                 .include(BufferBenchmark.class.getName())
-                .addProfiler(GCProfiler.class)
-                .addProfiler(HotspotMemoryProfiler.class)
-                .addProfiler(HotspotRuntimeProfiler.class)
-                .addProfiler(HotspotThreadProfiler.class)
-                .addProfiler(PausesProfiler.class)
-                .addProfiler(StackProfiler.class)
                 .verbosity(VerboseMode.EXTRA)
                 .build();
 
@@ -52,77 +45,52 @@ public class BufferBenchmark {
     }
 
     @Benchmark
-    public void readDirect(DirectContext context) {
+    public void read(Context context) {
+        Verify.verifyNotNull(context.buffer);
+        Verify.verifyNotNull(context.dataBuffer);
+
         context.buffer.read(0, context.dataBuffer);
     }
 
-    @Benchmark
-    public void readHeap(HeapContext context) {
-        context.buffer.read(0, context.dataBuffer);
-    }
 
     @Benchmark
-    public void writeDirect(DirectContext context) {
+    public void write(Context context) {
         context.buffer.write(0, context.dataBuffer);
     }
 
-    @Benchmark
-    public void writeHeap(HeapContext context) {
-        context.buffer.write(0, context.dataBuffer);
-    }
 
     @Benchmark
-    public void scanDirect(DirectContext context) {
+    public void scan(Context context) {
         for (int i = 0; i < context.buffer.bufferSize(); i += context.bufferSize) {
             context.buffer.read(0, context.dataBuffer);
         }
     }
 
-    @Benchmark
-    public void scanHeap(HeapContext context) {
-        for (int i = 0; i < context.bufferSize; i += context.bufferSize) {
-            context.buffer.read(0, context.dataBuffer);
-        }
-    }
-
 
     @State(Scope.Benchmark)
-    public static class DirectContext extends Context {
-
-        @Setup
-        public void setUp() {
-            super.setUp();
-            buffer = BufferType.DIRECT.get(ALLOCATED_SIZE);
-        }
-    }
-
-    @State(Scope.Benchmark)
-    public static class HeapContext extends Context {
-
-        @Setup
-        public void setUp() {
-            super.setUp();
-            buffer = BufferType.HEAP.get(ALLOCATED_SIZE);
-        }
-    }
-
-    @State(Scope.Benchmark)
-    public static abstract class Context {
+    public static class Context {
         public static final int ALLOCATED_SIZE = 512 * 1024 * 1024;
 
         @Param({
-//                "4",
-//                "8", "20", "32", "64", "4096",
-                "65536"})
+//                "8",
+                "64",
+                "4096",
+//                "65536"
+        })
         int bufferSize;
+
+        @Param({"HEAP", "DIRECT", "UNSAFE"})
+        BufferType bufferType;
 
         Buffer buffer;
 
+
         byte[] dataBuffer;
 
-        @Before
+        @Setup
         public void setUp() {
             dataBuffer = new byte[bufferSize];
+            buffer = bufferType.get(ALLOCATED_SIZE);
         }
 
     }

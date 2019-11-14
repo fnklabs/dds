@@ -2,17 +2,17 @@ package com.fnklabs.dds.network;
 
 import com.google.common.net.HostAndPort;
 import com.google.common.util.concurrent.AbstractFuture;
-import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.concurrent.TimeUnit;
 
-@RequiredArgsConstructor
 public class ResponseFuture extends AbstractFuture<ReplyMessage> {
     private static final int TIMEOUT = 35_000;
     private final RequestMessage message;
 
     private final long createdAt = System.nanoTime();
+
+    public ResponseFuture(RequestMessage message) {this.message = message;}
 
     public void onResponse(ReplyMessage connectorMessage) {
         set(connectorMessage);
